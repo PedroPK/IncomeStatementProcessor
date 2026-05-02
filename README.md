@@ -216,31 +216,116 @@ export GOOGLE_SHEETS_ENABLED=true
 export GOOGLE_SHEETS_SPREADSHEET_NAME="Meus Informes IRPF"
 ```
 
-## 📝 Exemplos de Saída
+## � Exemplos de Saída (Dados Mockados)
 
-### Dados Brutos (Tab 1)
+### Aba 1: Dados Brutos
+
+Contém todas as 10 entradas com 19 colunas, formatadas como Excel Table com linhas alternadas:
+
+| Arquivo | Instituição | Seção | Grupo | Código | Descrição | 2024 | 2025 | Rendimento |
+|---------|-------------|-------|-------|--------|-----------|------|------|-----------|
+| Accenture - Informe... | Accenture | Rendimentos Tributáveis PJ | | 01 | Rendimentos de PJ | R$ 0 | R$ 45,000 | R$ 0.00 |
+| Accenture - Informe... | Accenture | Rendimentos Tributação Exclusiva | | 11 | PLR 2025 | R$ 0 | R$ 0 | R$ 12,500.00 |
+| Itau - Informe... | Itaú Bank | Bens e Direitos | 04 | 02 | Títulos públicos/privados | R$ 50,000 | R$ 52,500 | R$ 0.00 |
+| Itau - Informe... | Itaú Bank | Rendimentos Tributação Exclusiva | | 06 | Rendimento de aplicações | R$ 0 | R$ 0 | R$ 2,500.00 |
+| Bradesco - Informe... | Bradesco Corretora | Bens e Direitos | 07 | 01 | Fundos de investimento | R$ 100,000 | R$ 115,000 | R$ 0.00 |
+
+### Aba 2: Resumo (Pivot por Seção × Instituição)
+
+Agrupa os valores por seção e instituição para visão consolidada:
+
+| Seção | Accenture | Bradesco | Itaú Bank | NuBank | XP | Total |
+|-------|-----------|----------|-----------|--------|-----|-------|
+| **Bens e Direitos** | R$ 0 | R$ 215,000 | R$ 52,500 | R$ 53,700 | R$ 2,150 | R$ 323,350 |
+| **Rendimentos Tributáveis PJ** | R$ 45,000 | — | — | — | — | R$ 45,000 |
+| **Rendimentos Tributação Exclusiva** | R$ 12,500 | R$ 8,750 | R$ 2,500 | — | R$ 125.50 | R$ 23,875.50 |
+| **TOTAL** | **R$ 57,500** | **R$ 223,750** | **R$ 55,000** | **R$ 53,700** | **R$ 2,275.50** | **R$ 392,225.50** |
+
+### Aba 3: Totais (Agregação por Grupo/Código)
+
+Consolida todos os valores por classificação IRPF (Grupo/Código):
+
+| Grupo | Código | Descrição | 2024 | 2025 | Rendimento | Total |
+|-------|--------|-----------|------|------|-----------|-------|
+| — | 01 | Rendimentos de PJ | R$ 0 | R$ 45,000 | R$ 0 | R$ 45,000 |
+| — | 06 | Rendimento de aplicações financeiras | R$ 0 | R$ 0 | R$ 11,375.50 | R$ 11,375.50 |
+| — | 11 | Participação nos lucros/resultados | R$ 0 | R$ 0 | R$ 12,500 | R$ 12,500 |
+| **03** | **01** | **Ações** | **R$ 1,850** | **R$ 2,150** | **R$ 0** | **R$ 4,000** |
+| **04** | **02** | **Títulos públicos/privados** | **R$ 80,000** | **R$ 83,700** | **R$ 0** | **R$ 163,700** |
+| **07** | **01** | **Fundos de investimento** | **R$ 100,000** | **R$ 115,000** | **R$ 0** | **R$ 215,000** |
+| **08** | **01** | **Bitcoin (BTC)** | **R$ 15,000** | **R$ 22,500** | **R$ 0** | **R$ 37,500** |
+| **TOTAL GERAL** | | | **R$ 196,850** | **R$ 268,350** | **R$ 23,875.50** | **R$ 489,075.50** |
+
+### Aba 4: Para IRPF (Agrupado por Instituição)
+
+Organizado por instituição com subtotais por seção — facilita preenchimento direto da DIRPF:
+
+| Instituição | Seção | Grupo | Código | 2024 | 2025 | Rendimento |
+|-------------|-------|-------|--------|------|------|-----------|
+| **Accenture** | Rendimentos Tributáveis PJ | — | 01 | R$ 0 | R$ 45,000 | R$ 0 |
+| | Rendimentos Tributação Exclusiva | — | 11 | R$ 0 | R$ 0 | R$ 12,500 |
+| | *Subtotal Accenture* | | | R$ 0 | R$ 45,000 | R$ 12,500 |
+| **Bradesco Corretora** | Bens e Direitos | 07 | 01 | R$ 100,000 | R$ 115,000 | R$ 0 |
+| | Rendimentos Tributação Exclusiva | — | 06 | R$ 0 | R$ 0 | R$ 8,750 |
+| | *Subtotal Bradesco* | | | R$ 100,000 | R$ 115,000 | R$ 8,750 |
+| **Itaú Bank** | Bens e Direitos | 04 | 02 | R$ 50,000 | R$ 52,500 | R$ 0 |
+| | Rendimentos Tributação Exclusiva | — | 06 | R$ 0 | R$ 0 | R$ 2,500 |
+| | *Subtotal Itaú* | | | R$ 50,000 | R$ 52,500 | R$ 2,500 |
+
+**Resumo de Dados Mockados:**
 ```
-Arquivo | Instituição | CNPJ | Ano | Seção | Grupo | Código | Descrição | 2024 | 2025 | Rendimento
-Avenue...pdf | Avenue Securities LLC | | 2025 | Bens e Direitos | 03 | 01 | GOOGL – Alphabet Inc | 0.00 | 2,013.39 | 6.18
-XP...pdf | XP Investimentos | | 2025 | Rendimentos Trib. Excl. | | 06 | Fundos/Clubes | 62,371.82 | 67,562.19 | 5,133.46
+Entradas: 10 de 5 instituições
+Total 2024: R$ 196,850.00
+Total 2025: R$ 268,350.00
+Total Rendimentos: R$ 23,875.50
+Total IRRF: R$ 5,287.65
 ```
 
-### Resumo (Tab 2)
-```
-Seção | Grupo | Código | Accenture | Avenue | Inter | ... | TOTAL
-Bens e Direitos | 03 | 01 | 0.00 | 2,013.39 | 0.00 | | 2,013.39
-Rendimentos Trib. Excl. | | 06 | 0.00 | 0.00 | 1,243.13 | | 1,243.13
+## 🧪 Testes Automatizados
+
+O projeto inclui testes de integração com dados mockados que cobrem o pipeline completo:
+
+```bash
+# Executar testes de integração
+python3 test_integration.py
 ```
 
-### Totais (Tab 3)
+**Testes incluídos:**
+
+- ✅ `test_mock_data_integrity()`: Valida estrutura e consistência de dados
+- ✅ `test_xlsx_generation_with_mock_data()`: Testa geração XLSX completa (4 abas)
+- ✅ `test_mock_data_summary()`: Imprime resumo de dados e consolidação
+- ✅ `get_markdown_tables_for_documentation()`: Gera tabelas para documentação
+
+**Exemplo de saída:**
 ```
-Grupo | Código | Descrição | 2024 | 2025 | Rendimento | Total
-03 | 01 | Ações | 0.00 | 2,013.39 | 6.18 | 2,019.57
-04 | 02 | Títulos Públicos/Privados | 266,860.99 | 322,222.75 | 18,285.14 | 340,507.89
-06 | 01 | Depósitos em Conta | 323.05 | 1,082.42 | 0.00 | 1,082.42
-...
-TOTAL GERAL | | | 614,445.82 | 689,842.38 | 51,227.04 | 741,069.42
+✅ Integridade de 10 entradas verificada
+
+=== RESUMO DOS DADOS MOCKADOS ===
+Entradas: 10
+Instituições: 5
+Total 2024: R$ 196,850.00
+Total 2025: R$ 268,350.00
+Total Rendimentos: R$ 23,875.50
+Total IRRF: R$ 5,287.65
+
+✅ XLSX gerado com sucesso: /tmp/test_output.xlsx
+   Tamanho: 12.9KB
+   Entradas processadas: 10
+
+✅ Todos os testes passaram com sucesso!
 ```
+
+**Dados de Teste (Mock):**
+
+Os testes usam 10 entradas fictícias de 5 instituições diferentes:
+- **Accenture**: Rendimentos de PJ e PLR
+- **Itaú Bank**: Renda fixa (CDB)
+- **Bradesco Corretora**: Fundos de investimento
+- **XP Investimentos**: Ativos internacionais (ações)
+- **NuBank**: Renda fixa e criptoativos (Bitcoin)
+
+Nenhum dado pessoal real é utilizado. Valores e descrições são completamente fictícios.
 
 ## 🐛 Troubleshooting
 
