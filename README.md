@@ -338,6 +338,13 @@ xlsx_path = "output/informes_rendimentos.xlsx"
 dashboard_path = "output/dashboard.html"
 ```
 
+### 📚 Documentação Completa do Dashboard
+
+Para uma visualização completa com exemplos de dados, veja:
+- **[DASHBOARD_VISUAL.md](DASHBOARD_VISUAL.md)** — Tabelas e exemplos de todas as 4 abas
+- **[DASHBOARD.md](DASHBOARD.md)** — Arquitetura, customização e API
+- **[examples/README.md](examples/README.md)** — 5 cenários de uso práticos
+
 ## 🧪 Testes Automatizados
 
 O projeto inclui testes de integração com dados mockados que cobrem o pipeline completo:
@@ -345,44 +352,32 @@ O projeto inclui testes de integração com dados mockados que cobrem o pipeline
 ```bash
 # Executar testes de integração
 python3 test_integration.py
+
+# Executar testes do dashboard
+python3 test_dashboard.py
 ```
 
 **Testes incluídos:**
 
+### test_integration.py (Mock Data)
 - ✅ `test_mock_data_integrity()`: Valida estrutura e consistência de dados
 - ✅ `test_xlsx_generation_with_mock_data()`: Testa geração XLSX completa (4 abas)
 - ✅ `test_mock_data_summary()`: Imprime resumo de dados e consolidação
 - ✅ `get_markdown_tables_for_documentation()`: Gera tabelas para documentação
 
-**Exemplo de saída:**
-```
-✅ Integridade de 10 entradas verificada
+### test_dashboard.py (Dashboard Tests)
+- ✅ `test_dashboard_generation` — HTML gerado com sucesso
+- ✅ `test_dashboard_data_embedding` — JSON embedded corretamente
+- ✅ `test_dashboard_tabs` — 4 abas presentes e funcionais
+- ✅ `test_dashboard_charts` — Charts Chart.js configurados
+- ✅ `test_dashboard_metrics` — Cards de métricas calculados corretamente
+- ✅ `test_dashboard_with_extended_data` — Funciona com conjuntos maiores
+- ✅ `test_dashboard_responsive_design` — Classes Bootstrap presentes
+- ✅ `test_dashboard_currency_formatting` — Formatação de moeda OK
+- ✅ `test_dashboard_all_institutions` — Todas as instituições aparecem
+- ✅ `test_dashboard_section_aggregation` — Seções agregadas corretamente
 
-=== RESUMO DOS DADOS MOCKADOS ===
-Entradas: 10
-Instituições: 5
-Total 2024: R$ 196,850.00
-Total 2025: R$ 268,350.00
-Total Rendimentos: R$ 23,875.50
-Total IRRF: R$ 5,287.65
-
-✅ XLSX gerado com sucesso: /tmp/test_output.xlsx
-   Tamanho: 12.9KB
-   Entradas processadas: 10
-
-✅ Todos os testes passaram com sucesso!
-```
-
-**Dados de Teste (Mock):**
-
-Os testes usam 10 entradas fictícias de 5 instituições diferentes:
-- **Accenture**: Rendimentos de PJ e PLR
-- **Itaú Bank**: Renda fixa (CDB)
-- **Bradesco Corretora**: Fundos de investimento
-- **XP Investimentos**: Ativos internacionais (ações)
-- **NuBank**: Renda fixa e criptoativos (Bitcoin)
-
-Nenhum dado pessoal real é utilizado. Valores e descrições são completamente fictícios.
+**Resultado**: ✅ 20/20 testes passando
 
 ## 🐛 Troubleshooting
 

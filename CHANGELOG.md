@@ -47,7 +47,40 @@ e este projeto adere a [Semantic Versioning](https://semver.org/lang/pt-BR/).
   - Cobertura: 5 instituições mockadas (Accenture, Itaú, Bradesco, XP, NuBank)
   - Nenhum dado pessoal real — valores completamente fictícios
 
+- **`test_dashboard.py`** (NOVO): Suite completa de testes para dashboard (10 testes)
+  - `test_dashboard_generation()`: Verifica geração de HTML válido
+  - `test_dashboard_data_embedding()`: Valida JSON embarcado
+  - `test_dashboard_tabs()`: Confirma 4 abas presentes e funcionais
+  - `test_dashboard_charts()`: Verifica configuração Chart.js (Pie + Bar)
+  - `test_dashboard_metrics()`: Valida cards de métricas
+  - `test_dashboard_with_extended_data()`: Testa com dados estendidos (7 entradas)
+  - `test_dashboard_responsive_design()`: Verifica classes Bootstrap
+  - `test_dashboard_currency_formatting()`: Valida formatação BRL
+  - `test_dashboard_all_institutions()`: Confirma agrupamento de instituições
+  - `test_dashboard_section_aggregation()`: Verifica agregação de seções
+  - **Resultado**: ✅ 10/10 testes passando
+
+- **`EXTENDED_TEST_DATA`** (NOVO): Conjunto estendido de dados de teste
+  - 7 entradas fictícias de 6 instituições (mais realistas que mock data)
+  - Total 2024: R$ 563.500,00
+  - Total 2025: R$ 709.700,00
+  - Rendimentos: R$ 74.250,00
+  - Uso: Testes abrangentes do dashboard, cenários complexos
+
 #### Documentação Visual
+- **`DASHBOARD_VISUAL.md`** (NOVO): Documentação completa com exemplos visuais
+  - 356 linhas de documentação estruturada
+  - Métricas principais com dados mockados e reais
+  - Exemplos de todas as 4 abas com dados de exemplo
+  - Gráficos explicados (Pie + Bar)
+  - Recursos de design (cores, responsividade)
+  - Comparação de volumes (Mock vs Extended vs Real)
+  - **10 tabelas markdown** mostrando exatamente como ficam as abas
+
+- **`generate_dashboard_docs.py`** (NOVO): Script gerador de documentação
+  - Gera `DASHBOARD_VISUAL.md` automaticamente
+  - Função `generate_dashboard_documentation()` reutilizável
+  - Mantém documentação sincronizada com código
 - **README.md atualizado** com exemplos de saída das 4 abas XLSX:
   - **Aba 1 - Dados Brutos**: Tabela com 5 primeiras linhas (19 colunas)
   - **Aba 2 - Resumo**: Pivot por Seção × Instituição com consolidação
