@@ -105,6 +105,12 @@ def main() -> None:
     print('\nGerando planilha XLSX...')
     write_xlsx(all_entries, xlsx_path)
 
+    # ── Generate Dashboard ────────────────────────────────────────────────────
+    print('Gerando dashboard HTML...')
+    from src.dashboard_generator import generate_dashboard_html
+    dashboard_path = config.get('output', {}).get('dashboard_path', 'dashboard.html')
+    generate_dashboard_html(all_entries, dashboard_path)
+
     # ── Optional Google Sheets ────────────────────────────────────────────────
     if gs_config.get('enabled', False):
         print('\nEnviando para Google Sheets...')

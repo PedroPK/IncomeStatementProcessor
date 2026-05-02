@@ -1,6 +1,7 @@
 # ── Output ──────────────────────────────────────────────────────────────────
 [output]
 xlsx_path = "output/informes_rendimentos.xlsx"
+dashboard_path = "output/dashboard.html"
 
 # ── Google Sheets (optional) ─────────────────────────────────────────────────
 [google_sheets]
