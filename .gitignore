@@ -7,3 +7,4 @@ output/
 credentials/credentials.json
 credentials/token.json
 /tmp/
+.DS_Store
