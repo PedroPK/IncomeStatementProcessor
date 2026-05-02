@@ -1,0 +1,10 @@
+# ── Output ──────────────────────────────────────────────────────────────────
+[output]
+xlsx_path = "output/informes_rendimentos.xlsx"
+
+# ── Google Sheets (optional) ─────────────────────────────────────────────────
+[google_sheets]
+enabled = false
+spreadsheet_name = "Informes de Rendimentos"
+credentials_file = "credentials/credentials.json"
+token_file = "credentials/token.json"
