@@ -4,7 +4,7 @@ __pycache__/
 *.pyo
 input/
 output/
-examples/
+examples/*.html
 credentials/credentials.json
 credentials/token.json
 /tmp/
