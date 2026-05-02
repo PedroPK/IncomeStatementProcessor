@@ -268,7 +268,6 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                                     <th class="currency">2024</th>
                                     <th class="currency">2025</th>
                                     <th class="currency">Rendimento</th>
-                                    <th class="currency">Total</th>
                                 </tr>
                             </thead>
                             <tbody id="tbody-totais"></tbody>
@@ -387,7 +386,6 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
 
             sorted.forEach(row => {{
                 const tr = document.createElement('tr');
-                const total = row.v2024 + row.v2025 + row.rend;
                 tr.innerHTML = `
                     <td>${{row.grupo || '-'}}</td>
                     <td>${{row.codigo}}</td>
@@ -395,7 +393,6 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                     <td class="currency">${{formatCurrency(row.v2024)}}</td>
                     <td class="currency">${{formatCurrency(row.v2025)}}</td>
                     <td class="currency">${{formatCurrency(row.rend)}}</td>
-                    <td class="currency"><strong>${{formatCurrency(total)}}</strong></td>
                 `;
                 tbody.appendChild(tr);
 
@@ -409,10 +406,9 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
             trTotal.className = 'total-row';
             trTotal.innerHTML = `
                 <td colspan="3"><strong>TOTAL GERAL</strong></td>
-                <td class="currency">${{formatCurrency(totalGeral2024)}}</td>
-                <td class="currency">${{formatCurrency(totalGeral2025)}}</td>
-                <td class="currency">${{formatCurrency(totalGeralRend)}}</td>
-                <td class="currency">${{formatCurrency(totalGeral2024 + totalGeral2025 + totalGeralRend)}}</td>
+                <td class="currency"><strong>${{formatCurrency(totalGeral2024)}}</strong></td>
+                <td class="currency"><strong>${{formatCurrency(totalGeral2025)}}</strong></td>
+                <td class="currency"><strong>${{formatCurrency(totalGeralRend)}}</strong></td>
             `;
             tbody.appendChild(trTotal);
         }}
