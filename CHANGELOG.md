@@ -9,6 +9,35 @@ e este projeto adere a [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ### ✨ Adicionado
 
+#### Dashboard Interativo
+- **`src/dashboard_generator.py`**: Módulo para geração programática de dashboard HTML
+  - Função `generate_dashboard_html(entries, output_path)`: Recebe lista de `Entry` e gera HTML
+  - **4 abas interativas**: Dados Brutos, Resumo, Totais, Para IRPF (sincronizadas com XLSX)
+  - **Gráficos dinâmicos** usando Chart.js:
+    - Pie chart: Distribuição de ativos por instituição (2025)
+    - Bar chart: Evolução 2024 → 2025 por instituição
+  - **Métricas-chave**: Cards com Total 2024, Total 2025, Rendimentos, Contagem
+  - **Design responsivo**: Bootstrap 5.3.0 com tema gradiente roxo
+  - **Formatação automática**: Moeda brasileira (Intl.NumberFormat pt-BR)
+  - Integrado automaticamente no pipeline `src/main.py`
+
+#### Integração no Pipeline
+- **`src/main.py`** atualizado: Gera dashboard automaticamente após XLSX
+  - Nova etapa: "Gerando dashboard HTML..." após XLSX
+  - Suporta configuração em `config.toml` (`output.dashboard_path`)
+- **`config.toml`** expandido com nova opção:
+  ```toml
+  [output]
+  xlsx_path = "output/informes_rendimentos.xlsx"
+  dashboard_path = "output/dashboard.html"
+  ```
+
+#### Documentação Dashboard
+- **README.md** com nova seção "📊 Dashboard Interativo"
+  - Instruções de visualização e uso programático
+  - Exemplo de saída com 59 entradas reais processadas
+  - Configuração através de `config.toml`
+
 #### Testes Automatizados
 - **`test_integration.py`**: Suite completa de testes de integração com dados mockados
   - `test_mock_data_integrity()`: Valida estrutura e consistência de 10 entradas fictícias
@@ -37,6 +66,7 @@ e este projeto adere a [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - Documentação de teste agora inclui exemplos práticos e execução automatizada
 - README com referências visuais para cada aba gerada
 - Confiabilidade para publicação online — sem risco de expor dados sensíveis
+- Pipeline automatizado gera 3 outputs simultâneos: XLSX, Dashboard HTML, Google Sheets (opcional)
 
 ### 📊 Métricas (Dados Mockados)
 
@@ -48,6 +78,7 @@ Total 2025: R$ 268,350.00
 Total Rendimentos: R$ 23,875.50
 Total IRRF: R$ 5,287.65
 XLSX gerado: 12.9KB
+Dashboard: 572 linhas HTML/JS/CSS
 ```
 
 ### ✅ Checklist v1.0.1

@@ -281,6 +281,63 @@ Total Rendimentos: R$ 23,875.50
 Total IRRF: R$ 5,287.65
 ```
 
+## 📊 Dashboard Interativo
+
+O projeto gera automaticamente um **dashboard HTML interativo** que visualiza os dados de forma dinâmica:
+
+### Recursos
+
+- **4 Abas Interativas**: Dados Brutos, Resumo, Totais, Para IRPF (mesmos dados do XLSX)
+- **Gráficos Dinâmicos**: 
+  - Pie chart: Distribuição de ativos por instituição (2025)
+  - Bar chart: Evolução 2024 → 2025 por instituição
+- **Métricas-Chave**: Cards destacando Total 2024, Total 2025, Rendimentos, Quantidade de Entradas
+- **Tabelas Responsivas**: Currency formatting automático (Intl.NumberFormat pt-BR)
+- **Bootstrap 5.3**: Design profissional e mobile-friendly
+
+### Visualização
+
+```bash
+# O dashboard é gerado automaticamente após a execução:
+python3 -m src.main
+
+# Saída:
+# Gerando dashboard HTML...
+# ✅ Dashboard gerado: output/dashboard.html
+#    Entradas: 59
+#    Total 2024: R$ 466.311,07
+#    Total 2025: R$ 651.499,50
+#    Total Rendimentos: R$ 55.792,97
+
+# Abra em seu navegador:
+open output/dashboard.html  # macOS
+# ou firefox output/dashboard.html  # Linux
+# ou start output/dashboard.html    # Windows
+```
+
+### Geração Programática
+
+Para gerar o dashboard a partir de código Python:
+
+```python
+from src.dashboard_generator import generate_dashboard_html
+from src.models import Entry
+
+# Com lista de entradas
+entries = [...]  # list[Entry]
+generate_dashboard_html(entries, 'meu_dashboard.html')
+```
+
+### Configuração
+
+Customize o caminho de saída do dashboard em `config.toml`:
+
+```toml
+[output]
+xlsx_path = "output/informes_rendimentos.xlsx"
+dashboard_path = "output/dashboard.html"
+```
+
 ## 🧪 Testes Automatizados
 
 O projeto inclui testes de integração com dados mockados que cobrem o pipeline completo:
