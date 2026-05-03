@@ -34,6 +34,7 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
             'grupo': entry.grupo,
             'codigo': entry.codigo,
             'descricao': entry.codigo_desc,
+            'discriminacao': entry.discriminacao,
             'v2024': entry.valor_2024,
             'v2025': entry.valor_2025,
             'rendimento': entry.rendimento,
@@ -752,11 +753,14 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                                 instTotal.v2025 += r.v2025 || 0;
                                 instTotal.rendimento += r.rendimento || 0;
                                 instTotal.irrf += r.irrf || 0;
+                                const tickerMatch = r.discriminacao && r.discriminacao.match(/^([A-Z0-9]{{4,7}})\s*[\u2013-]/);
+                                const ticker = tickerMatch ? tickerMatch[1] : null;
+                                const descDisplay = ticker ? `<strong>${{ticker}}</strong> — ${{r.descricao}}` : r.descricao;
                                 return `
                                     <tr>
                                         <td>${{r.grupo || '-'}}</td>
                                         <td>${{r.codigo}}</td>
-                                        <td>${{r.descricao}}</td>
+                                        <td>${{descDisplay}}</td>
                                         <td class="currency">${{formatCurrency(r.v2024)}}</td>
                                         <td class="currency">${{formatCurrency(r.v2025)}}</td>
                                         <td class="currency">${{formatCurrency(r.rendimento)}}</td>
