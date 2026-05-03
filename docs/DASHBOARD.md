@@ -35,7 +35,7 @@ Estilo: Cards com borda esquerda roxa, hover animation, valores em azul (#667eea
 
 **Exemplo com 6 instituições:**
 ```
-Accenture:           R$ 45.000,00  (7%)
+Empresa Empregadora LTDA:           R$ 45.000,00  (7%)
 Avenue Securities:   R$ 162.500,00 (25%)
 Inter:               R$ 115.000,00 (18%)
 NuBank:              R$ 150.000,00 (23%)
