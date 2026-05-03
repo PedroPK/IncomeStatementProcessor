@@ -1,42 +1,78 @@
 # 📸 Dashboard Screenshots
 
-Este diretório contém screenshots de referência do Dashboard Interativo capturados com Playwright.
+Este diretório contém screenshots de referência do Dashboard Interativo capturado em tempo real com Playwright. Aqui você encontra visualizações de todas as funcionalidades e estados do dashboard.
 
-## 📋 Arquivos
+---
 
-### Visualizações Completas
+## 🌟 Visualizações Completas
 
-| Arquivo | Descrição | Tamanho |
-|---------|-----------|---------|
-| `dashboard_full_light.png` | Dashboard completo em tema claro | 232.6KB |
-| `dashboard_full_dark.png` | Dashboard completo em tema escuro | 215.0KB |
-| `dashboard_responsive_mobile.png` | Versão mobile (375px de largura) | 179.5KB |
+### Dashboard Tema Claro
+Dashboard completo em tema claro com todos os gráficos e tabelas renderizados.
 
-### Seções Específicas
+![Dashboard Completo - Tema Claro](dashboard_full_light.png)
 
-| Arquivo | Descrição | Tamanho |
-|---------|-----------|---------|
-| `dashboard_charts_light.png` | Seção de gráficos em tema claro | 12.7KB |
-| `dashboard_charts_dark.png` | Seção de gráficos em tema escuro | 12.9KB |
-| `dashboard_table_light.png` | Tabela de dados brutos | 138.1KB |
+### Dashboard Tema Escuro
+A mesma interface com tema escuro para diferentes preferências de visualização.
 
-### Gráficos Detalhados
+![Dashboard Completo - Tema Escuro](dashboard_full_dark.png)
 
-| Arquivo | Descrição | Tamanho |
-|---------|-----------|---------|
-| `dashboard_chart_evolution.png` | Bar chart: Evolução 2024 → 2025 | 20.1KB |
-| `dashboard_chart_institution.png` | Pie chart: Distribuição por instituição | 24.8KB |
+### Dashboard Versão Mobile
+Visualização responsiva para dispositivos móveis (375px de largura).
 
-### Abas de Dados
+![Dashboard Mobile - Responsivo](dashboard_responsive_mobile.png)
 
-| Arquivo | Descrição | Tamanho |
-|---------|-----------|---------|
-| `dashboard_tab_resumo.png` | Aba "Resumo": Dados por seção/instituição | 78.9KB |
-| `dashboard_tab_totais.png` | Aba "Totais": Consolidação IRPF | 77.9KB |
+---
+
+## 📊 Seções Específicas do Dashboard
+
+### Gráficos e Visualizações
+Detalhe da seção de gráficos em tema claro.
+
+![Seção de Gráficos - Tema Claro](dashboard_charts_light.png)
+
+### Gráficos - Tema Escuro
+A mesma seção de gráficos em tema escuro.
+
+![Seção de Gráficos - Tema Escuro](dashboard_charts_dark.png)
+
+### Tabela de Dados Brutos
+Visualização completa da tabela com dados estruturados.
+
+![Tabela de Dados Brutos](dashboard_table_light.png)
+
+---
+
+## 📈 Análises Detalhadas
+
+### Gráfico de Evolução (2024 → 2025)
+Bar chart mostrando a evolução temporal dos dados entre períodos.
+
+![Gráfico de Evolução Temporal](dashboard_chart_evolution.png)
+
+### Distribuição por Instituição
+Pie chart apresentando a distribuição proporcional entre diferentes instituições.
+
+![Distribuição por Instituição](dashboard_chart_institution.png)
+
+---
+
+## 📋 Abas de Navegação
+
+### Aba "Resumo"
+Visualização consolidada dos dados organizados por seção e instituição.
+
+![Aba Resumo - Dados Consolidados](dashboard_tab_resumo.png)
+
+### Aba "Totais"
+Consolidação e resumo para fins de IRPF (Imposto de Renda Pessoa Física).
+
+![Aba Totais - Consolidação IRPF](dashboard_tab_totais.png)
+
+---
 
 ## 🔄 Como Regenerar Screenshots
 
-Os screenshots são gerados automaticamente usando **Playwright** e dados de teste mock.
+Os screenshots são gerados automaticamente usando **Playwright** e dados de teste mock. Siga os passos abaixo para capturar novas screenshots após alterações no dashboard.
 
 ### Pré-requisitos
 
