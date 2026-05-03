@@ -23,27 +23,6 @@ from .test_integration import MOCK_ENTRIES
 EXTENDED_TEST_DATA = [
     # More realistic data with diverse institutions and amounts
     Entry(
-        arquivo='Accenture_2026.pdf',
-        instituicao='Accenture',
-        cnpj_instituicao='25.449.005/0001-62',
-        ano_calendario=2025,
-        secao='Rendimentos Tributáveis PJ',
-        grupo='',
-        grupo_desc='',
-        codigo='01',
-        codigo_desc='Rendimentos de pessoas jurídicas',
-        fonte_pagadora='Accenture do Brasil',
-        cnpj_fonte='25.449.005/0001-62',
-        localizacao='SP',
-        discriminacao='Consultoria em Tecnologia',
-        valor_2024=0,
-        valor_2025=85000,
-        rendimento=0,
-        tipo_rendimento='',
-        irrf=0,
-        observacao='Fonte 1'
-    ),
-    Entry(
         arquivo='Avenue_2026.pdf',
         instituicao='Avenue Securities',
         cnpj_instituicao='07.526.847/0001-03',

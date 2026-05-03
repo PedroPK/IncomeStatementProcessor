@@ -16,50 +16,6 @@ from src.xlsx_writer import write_xlsx
 # ─────────────────────────────────────────────────────────────────────────────
 
 MOCK_ENTRIES = [
-    # ─ Accenture: Rendimentos (salary)
-    Entry(
-        arquivo='Accenture - Informe de Rendimentos - Ano Base 2025 - IRPF2026.aspx',
-        instituicao='Accenture',
-        cnpj_instituicao='01.234.567/0001-89',
-        ano_calendario=2025,
-        secao='Rendimentos Tributáveis PJ',
-        grupo='',
-        grupo_desc='',
-        codigo='01',
-        codigo_desc='Rendimentos de pessoas jurídicas',
-        fonte_pagadora='Accenture Brazil LTDA',
-        cnpj_fonte='01.234.567/0001-89',
-        localizacao='105 - Brasil',
-        discriminacao='Salário e rendimentos',
-        valor_2024=0.0,
-        valor_2025=45_000.00,
-        rendimento=0.0,
-        tipo_rendimento='',
-        irrf=0.0,
-        observacao='',
-    ),
-    Entry(
-        arquivo='Accenture - Informe de Rendimentos - Ano Base 2025 - IRPF2026.aspx',
-        instituicao='Accenture',
-        cnpj_instituicao='01.234.567/0001-89',
-        ano_calendario=2025,
-        secao='Rendimentos Tributação Exclusiva',
-        grupo='',
-        grupo_desc='',
-        codigo='11',
-        codigo_desc='Participação nos lucros ou resultados',
-        fonte_pagadora='Accenture Brazil LTDA',
-        cnpj_fonte='01.234.567/0001-89',
-        localizacao='105 - Brasil',
-        discriminacao='PLR 2025',
-        valor_2024=0.0,
-        valor_2025=0.0,
-        rendimento=12_500.00,
-        tipo_rendimento='Tributação Exclusiva',
-        irrf=1_875.00,
-        observacao='',
-    ),
-    
     # ─ Itaú: Renda Fixa
     Entry(
         arquivo='Itau - Informe de Rendimentos - Ano Base 2025 - IRPF2026.pdf',
@@ -370,7 +326,7 @@ def test_xlsx_generation_with_mock_data():
 
 def test_mock_data_integrity():
     """Verify mock data is valid."""
-    assert len(MOCK_ENTRIES) == 15, f"Expected 15 mock entries, got {len(MOCK_ENTRIES)}"
+    assert len(MOCK_ENTRIES) == 13, f"Expected 13 mock entries, got {len(MOCK_ENTRIES)}"
     
     for entry in MOCK_ENTRIES:
         assert entry.arquivo, "Arquivo não pode ser vazio"

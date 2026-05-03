@@ -91,6 +91,44 @@ Quatro abas interativas com dados sincronizados com XLSX:
 - **Desktop**: Layout completo com 4 cards + 2 charts lado a lado
 - **Bootstrap 5.3**: Grid system 12 colunas
 
+## 📸 Visualizações
+
+### Tema Claro (Light Mode)
+
+![Dashboard Light - Full Page](./screenshots/dashboard_full_light.png)
+
+A visualização padrão em tema claro com cores vibrantes e contraste otimizado para leitura durante o dia.
+
+#### Seção de Gráficos (Light)
+
+![Dashboard Charts - Light Mode](./screenshots/dashboard_charts_light.png)
+
+Pie chart de distribuição por instituição e bar chart de evolução 2024 vs 2025 em tema claro.
+
+#### Tabela de Dados (Light)
+
+![Dashboard Table - Light Mode](./screenshots/dashboard_table_light.png)
+
+Dados brutos com todas as colunas, formatação de moeda brasileira e hover effects.
+
+### Tema Escuro (Dark Mode)
+
+![Dashboard Dark - Full Page](./screenshots/dashboard_full_dark.png)
+
+Tema escuro para melhor experiência noturna, com cores ajustadas para legibilidade em fundo escuro.
+
+#### Seção de Gráficos (Dark)
+
+![Dashboard Charts - Dark Mode](./screenshots/dashboard_charts_dark.png)
+
+Mesmos gráficos em tema escuro com cores invertidas para conforto visual.
+
+### Responsividade
+
+![Dashboard Mobile - Responsive](./screenshots/dashboard_responsive_mobile.png)
+
+Visualização em dispositivo móvel (375px) com layout adaptado e tabelas com scroll horizontal.
+
 ## 🏗️ Arquitetura
 
 ### Fluxo de Dados
@@ -174,6 +212,52 @@ generate_dashboard_html(entries, 'meu_dashboard.html')
 python3 -m src.main
 # Processa ZIP → XLSX → Dashboard HTML (+ Google Sheets se habilitado)
 ```
+
+## 📊 Detalhes dos Gráficos
+
+### Gráfico de Evolução (2024 → 2025)
+
+![Evolution Chart](./screenshots/dashboard_chart_evolution.png)
+
+**Características:**
+- Tipo: Bar chart com duas séries (2024 em azul, 2025 em roxo)
+- Eixo X: Nomes das instituições (truncados pela configuração)
+- Eixo Y: Valores em Real (BRL)
+- **Nova Configuração**: Rótulos com rotação de **45 graus** (via `config.toml`)
+- Hover: Exibe valor exato com formatação brasileira
+- Responsivo: Adapta automaticamente em telas menores
+
+**Configuração da Rotação** (`config.toml`):
+```toml
+[dashboard]
+# Chart X-axis label rotation (degrees)
+chart_label_rotation = 45  # Pode variar entre 0-90
+```
+
+### Gráfico de Distribuição por Instituição (2025)
+
+![Institution Distribution Chart](./screenshots/dashboard_chart_institution.png)
+
+**Características:**
+- Tipo: Pie/Doughnut chart
+- Dados: Consolidação de `valor_2025` por instituição
+- Cores: Palette com 8 cores gradiente (roxo → azul → rosa → verde)
+- Legenda: Posicionada na parte inferior
+- Interação: Clique para destacar/esconder série
+
+### Abas de Dados
+
+#### Aba: Resumo (Resumo por Seção/Instituição)
+
+![Tab Resumo](./screenshots/dashboard_tab_resumo.png)
+
+Agregação de dados por Seção e Instituição com totais consolidados.
+
+#### Aba: Totais (IRPF Total)
+
+![Tab Totais](./screenshots/dashboard_tab_totais.png)
+
+Visão consolidada por Grupo e Código IRPF, essencial para preenchimento da Declaração de Imposto de Renda.
 
 ## 🎨 Customização
 

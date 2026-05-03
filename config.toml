@@ -18,6 +18,12 @@ label_truncation_value = "LTDA"
 # Add ellipsis (...) to truncated labels
 label_add_ellipsis = true
 
+# Chart X-axis label rotation (degrees)
+# - Positive values rotate labels clockwise
+# - Recommended range: 45 to 90 degrees
+# - Use 0 for horizontal labels
+chart_label_rotation = 60
+
 # Google Sheets (optional) ─────────────────────────────────────────────────
 [google_sheets]
 enabled = false

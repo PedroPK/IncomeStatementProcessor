@@ -814,7 +814,11 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                             grid: {{ color: colors.grid }}
                         }},
                         x: {{
-                            ticks: {{ color: colors.text }},
+                            ticks: {{ 
+                                color: colors.text,
+                                maxRotation: {dashboard_config.get('chart_label_rotation', 45)},
+                                minRotation: {dashboard_config.get('chart_label_rotation', 45)}
+                            }},
                             grid: {{ color: colors.grid }}
                         }}
                     }},
