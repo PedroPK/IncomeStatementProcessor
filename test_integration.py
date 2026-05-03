@@ -235,6 +235,50 @@ MOCK_ENTRIES = [
         irrf=0.0,
         observacao='Isenta',
     ),
+    
+    # ─ Clear: Fundos e Renda Fixa
+    Entry(
+        arquivo='Clear - 01 Informe de Rendimentos - Ano Base 2025 - IRPF2026.pdf',
+        instituicao='Clear',
+        cnpj_instituicao='02.332.886/0001-04',
+        ano_calendario=2025,
+        secao='Bens e Direitos',
+        grupo='07',
+        grupo_desc='Aplicações e investimentos',
+        codigo='01',
+        codigo_desc='Fundos de investimento sujeitos à tributação',
+        fonte_pagadora='Clear',
+        cnpj_fonte='02.332.886/0001-04',
+        localizacao='105 - Brasil',
+        discriminacao='Fundo Multimercado (Clear)',
+        valor_2024=40_000.00,
+        valor_2025=42_800.00,
+        rendimento=0.0,
+        tipo_rendimento='',
+        irrf=0.0,
+        observacao='',
+    ),
+    Entry(
+        arquivo='Clear - 01 Informe de Rendimentos - Ano Base 2025 - IRPF2026.pdf',
+        instituicao='Clear',
+        cnpj_instituicao='02.332.886/0001-04',
+        ano_calendario=2025,
+        secao='Rendimentos Tributação Exclusiva',
+        grupo='',
+        grupo_desc='',
+        codigo='06',
+        codigo_desc='Rendimento de aplicações financeiras',
+        fonte_pagadora='Clear',
+        cnpj_fonte='02.332.886/0001-04',
+        localizacao='105 - Brasil',
+        discriminacao='Rendimentos de Fundo',
+        valor_2024=0.0,
+        valor_2025=0.0,
+        rendimento=1_280.00,
+        tipo_rendimento='Tributação Exclusiva',
+        irrf=384.00,
+        observacao='',
+    ),
 ]
 
 
@@ -261,7 +305,7 @@ def test_xlsx_generation_with_mock_data():
 
 def test_mock_data_integrity():
     """Verify mock data is valid."""
-    assert len(MOCK_ENTRIES) == 10, f"Expected 10 mock entries, got {len(MOCK_ENTRIES)}"
+    assert len(MOCK_ENTRIES) == 12, f"Expected 12 mock entries, got {len(MOCK_ENTRIES)}"
     
     for entry in MOCK_ENTRIES:
         assert entry.arquivo, "Arquivo não pode ser vazio"

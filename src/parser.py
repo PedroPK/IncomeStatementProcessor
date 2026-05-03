@@ -26,6 +26,8 @@ def detect_institution(filename: str, first_page: str) -> str:
 
     if 'accenture' in fname:
         return 'accenture'
+    if 'clear' in fname or 'www.clear.com.br' in text:
+        return 'clear'
     if 'nubank' in fname or 'nu bank' in fname:
         return 'nubank'
     if ('xp' in fname and 'prev' in fname) or 'previd' in fname:
@@ -77,6 +79,7 @@ def parse_file(filepath: str) -> list[Entry]:
         'xp': parse_xp,
         'avenue': parse_avenue,
         'inter': parse_inter,
+        'clear': parse_clear,
     }
 
     parser_fn = parsers.get(institution)
@@ -527,6 +530,29 @@ def parse_xp_previdencia(filename: str, pages_text: list[str],
                 valor_2025=parse_brl(m.group(1)), tipo_rendimento='Dedução',
             ))
 
+    return entries
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CLEAR  (Informe padrão Ministério da Economia – reutiliza lógica XP)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def parse_clear(filename: str, pages_text: list[str],
+                pages_tables: list[list]) -> list[Entry]:
+    """
+    Parse Clear broker documents using XP logic (same Ministério format).
+    
+    Clear offers investment brokerage through XP's infrastructure, using
+    the standard "Informe de Rendimentos" format from Ministério da Economia.
+    """
+    from dataclasses import replace
+    
+    # Use the same parsing logic as XP since Clear uses the standard format
+    entries = parse_xp(filename, pages_text, pages_tables)
+    
+    # Update institution name to "Clear" while preserving other parsed data
+    entries = [replace(e, instituicao='Clear') for e in entries]
+    
     return entries
 
 
