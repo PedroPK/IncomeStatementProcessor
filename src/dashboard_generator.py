@@ -2,7 +2,7 @@
 Generate interactive HTML dashboard from Income Statement Processor data.
 
 This script creates a bootstrap-based dashboard with charts and tables
-from either real XLSX data or mock test data.
+from either real XLSX data or mock test data, with light/dark mode support.
 """
 
 import json
@@ -17,7 +17,7 @@ def format_currency(value: float) -> str:
 
 def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') -> None:
     """
-    Generate interactive dashboard from entries.
+    Generate interactive dashboard from entries with dark mode support.
     
     Args:
         entries: List of Entry objects
@@ -57,74 +57,156 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
+        :root {{
+            --primary-color: #667eea;
+            --secondary-color: #764ba2;
+            --bg-light: #f8f9fa;
+            --bg-light-card: #ffffff;
+            --text-light: #333333;
+            --text-muted: #999999;
+            --border-light: #e9ecef;
+            --table-header-light: #f0f0f0;
+        }}
+        
+        html.dark-mode {{
+            --primary-color: #667eea;
+            --secondary-color: #764ba2;
+            --bg-light: #1a1a1a;
+            --bg-light-card: #2d2d2d;
+            --text-light: #e0e0e0;
+            --text-muted: #999999;
+            --border-light: #3d3d3d;
+            --table-header-light: #3d3d3d;
+        }}
+        
+        * {{
+            transition: background-color 0.3s, color 0.3s;
+        }}
+        
         body {{
-            background-color: #f8f9fa;
+            background-color: var(--bg-light);
+            color: var(--text-light);
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }}
+        
         .navbar {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }}
+        
+        .navbar-content {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            padding: 0 15px;
+        }}
+        
+        .navbar-title {{
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }}
+        
+        .theme-toggle {{
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }}
+        
+        .theme-toggle:hover {{
+            background: rgba(255,255,255,0.3);
+            box-shadow: 0 0 10px rgba(255,255,255,0.2);
+        }}
+        
         .card {{
             border: none;
             border-radius: 10px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             transition: transform 0.3s, box-shadow 0.3s;
+            background-color: var(--bg-light-card);
+            color: var(--text-light);
+            border: 1px solid var(--border-light);
         }}
+        
         .card:hover {{
             transform: translateY(-2px);
             box-shadow: 0 4px 15px rgba(0,0,0,0.15);
         }}
+        
         .metric-card {{
-            border-left: 4px solid #667eea;
+            border-left: 4px solid var(--primary-color);
             padding: 20px;
         }}
+        
         .metric-value {{
             font-size: 24px;
             font-weight: bold;
-            color: #667eea;
+            color: var(--primary-color);
         }}
+        
         .metric-label {{
             font-size: 12px;
-            color: #999;
+            color: var(--text-muted);
             text-transform: uppercase;
             margin-top: 5px;
         }}
+        
         .tab-content {{
             display: none;
         }}
+        
         .tab-content.active {{
             display: block;
         }}
+        
         .nav-tabs .nav-link {{
-            color: #667eea;
+            color: var(--text-muted);
             border: none;
             border-bottom: 2px solid transparent;
             transition: all 0.3s;
         }}
+        
         .nav-tabs .nav-link.active {{
-            color: #667eea;
+            color: var(--primary-color);
             background-color: transparent;
-            border-bottom: 2px solid #667eea;
+            border-bottom: 2px solid var(--primary-color);
         }}
+        
         .chart-container {{
             position: relative;
             height: 300px;
             margin: 20px 0;
         }}
+        
         table {{
             font-size: 13px;
+            background-color: var(--bg-light-card);
+            color: var(--text-light);
         }}
+        
         thead {{
-            background-color: #f0f0f0;
+            background-color: var(--table-header-light);
             font-weight: 600;
+            color: var(--text-light);
         }}
+        
+        tbody tr:hover {{
+            background-color: var(--border-light) !important;
+        }}
+        
         .currency {{
             text-align: right;
             font-family: 'Courier New', monospace;
         }}
+        
         .section-header {{
-            background-color: #667eea;
+            background-color: var(--primary-color);
             color: white;
             padding: 10px 15px;
             border-radius: 5px;
@@ -132,19 +214,46 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
             margin-bottom: 10px;
             font-weight: 600;
         }}
+        
         .total-row {{
-            background-color: #667eea;
+            background-color: var(--primary-color);
             color: white;
             font-weight: bold;
+        }}
+        
+        .navbar-brand {{
+            color: white;
+            font-weight: bold;
+            margin: 0;
+        }}
+        
+        .navbar-text {{
+            color: rgba(255,255,255,0.7);
+            margin: 0;
+        }}
+        
+        .container-fluid {{
+            background-color: var(--bg-light);
+        }}
+        
+        footer {{
+            color: var(--text-muted);
+            border-top: 1px solid var(--border-light);
+            padding-top: 20px;
         }}
     </style>
 </head>
 <body>
     <!-- Navigation -->
     <nav class="navbar navbar-dark mb-4">
-        <div class="container-fluid">
-            <span class="navbar-brand mb-0 h1">📊 Income Statement Processor</span>
-            <span class="navbar-text text-white-50">Dashboard - IRPF 2026</span>
+        <div class="navbar-content container-fluid">
+            <div class="navbar-title">
+                <span class="navbar-brand mb-0 h1">📊 Income Statement Processor</span>
+                <span class="navbar-text">Dashboard - IRPF 2026</span>
+            </div>
+            <button class="theme-toggle" onclick="toggleTheme()">
+                <span id="theme-icon">🌙 Dark Mode</span>
+            </button>
         </div>
     </nav>
 
@@ -283,10 +392,11 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
         </div>
 
         <!-- Footer -->
-        <footer class="text-center mt-5 mb-3 text-muted">
+        <footer class="text-center mt-5 mb-3">
             <small>
-                Income Statement Processor v1.0.1 | 
-                Gerado em 2026-05-02
+                Income Statement Processor v1.1.0 | 
+                Gerado em 2026-05-02 | 
+                Com suporte a Dark Mode 🌙
             </small>
         </footer>
     </div>
@@ -295,35 +405,68 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
         // Data embedded in HTML
         const mockData = {json.dumps(data_json)};
 
+        // Theme Management
+        function initializeTheme() {{
+            const savedTheme = localStorage.getItem('dashboard-theme') || 'light';
+            if (savedTheme === 'dark') {{
+                document.documentElement.classList.add('dark-mode');
+                document.getElementById('theme-icon').textContent = '☀️ Light Mode';
+            }}
+        }}
+        
+        function toggleTheme() {{
+            const html = document.documentElement;
+            const isDark = html.classList.contains('dark-mode');
+            
+            if (isDark) {{
+                html.classList.remove('dark-mode');
+                localStorage.setItem('dashboard-theme', 'light');
+                document.getElementById('theme-icon').textContent = '🌙 Dark Mode';
+                updateCharts('light');
+            }} else {{
+                html.classList.add('dark-mode');
+                localStorage.setItem('dashboard-theme', 'dark');
+                document.getElementById('theme-icon').textContent = '☀️ Light Mode';
+                updateCharts('dark');
+            }}
+        }}
+
         // Format currency
         function formatCurrency(value) {{
             return new Intl.NumberFormat('pt-BR', {{
                 style: 'currency',
-                currency: 'BRL',
-                minimumFractionDigits: 2
+                currency: 'BRL'
             }}).format(value);
         }}
 
-        // Tab switching
+        // Tab Switching
         function switchTab(tabName, event) {{
             event.preventDefault();
-            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-            document.getElementById(tabName).classList.add('active');
             
-            document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+            // Hide all tabs
+            const tabs = document.querySelectorAll('.tab-content');
+            tabs.forEach(tab => tab.classList.remove('active'));
+            
+            // Remove active from all links
+            const links = document.querySelectorAll('.nav-link');
+            links.forEach(link => link.classList.remove('active'));
+            
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
             event.target.classList.add('active');
         }}
 
-        // Populate Dados Brutos
-        function populateDadosBrutos() {{
+        // Populate tabs
+        function populateTabs() {{
+            // Tab 1: Dados Brutos
             const tbody = document.getElementById('tbody-brutos');
             mockData.forEach(row => {{
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td><small>${{row.arquivo}}</small></td>
-                    <td><strong>${{row.instituicao}}</strong></td>
+                    <td>${{row.arquivo}}</td>
+                    <td>${{row.instituicao}}</td>
                     <td>${{row.secao}}</td>
-                    <td>${{row.grupo || '-'}}</td>
+                    <td>${{row.grupo}}</td>
                     <td>${{row.codigo}}</td>
                     <td>${{row.descricao}}</td>
                     <td class="currency">${{formatCurrency(row.v2024)}}</td>
@@ -332,237 +475,354 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                 `;
                 tbody.appendChild(tr);
             }});
-        }}
 
-        // Populate Resumo
-        function populateResumo() {{
-            const tbody = document.getElementById('tbody-resumo');
-            const resumoData = {{}};
-
+            // Tab 2: Resumo
+            const resumo = {{}};
             mockData.forEach(row => {{
-                const key = `${{row.secao}}|${{row.instituicao}}`;
-                if (!resumoData[key]) {{
-                    resumoData[key] = {{ secao: row.secao, inst: row.instituicao, v2024: 0, v2025: 0, rend: 0 }};
+                const key = row.secao + '|' + row.instituicao;
+                if (!resumo[key]) {{
+                    resumo[key] = {{
+                        secao: row.secao,
+                        instituicao: row.instituicao,
+                        v2024: 0,
+                        v2025: 0,
+                        rendimento: 0
+                    }};
                 }}
-                resumoData[key].v2024 += row.v2024;
-                resumoData[key].v2025 += row.v2025;
-                resumoData[key].rend += row.rendimento;
+                resumo[key].v2024 += row.v2024;
+                resumo[key].v2025 += row.v2025;
+                resumo[key].rendimento += row.rendimento;
             }});
-
-            Object.values(resumoData).sort((a, b) => a.secao.localeCompare(b.secao)).forEach(row => {{
+            
+            const tbodyResumo = document.getElementById('tbody-resumo');
+            Object.values(resumo).forEach(row => {{
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${{row.secao}}</td>
-                    <td>${{row.inst}}</td>
+                    <td>${{row.instituicao}}</td>
                     <td class="currency">${{formatCurrency(row.v2024)}}</td>
                     <td class="currency">${{formatCurrency(row.v2025)}}</td>
-                    <td class="currency">${{formatCurrency(row.rend)}}</td>
+                    <td class="currency">${{formatCurrency(row.rendimento)}}</td>
                 `;
-                tbody.appendChild(tr);
+                tbodyResumo.appendChild(tr);
             }});
-        }}
 
-        // Populate Totais
-        function populateTotais() {{
-            const tbody = document.getElementById('tbody-totais');
-            const totaisData = {{}};
-
+            // Tab 3: Totais
+            const totais = {{}};
             mockData.forEach(row => {{
-                const key = `${{row.grupo}}|${{row.codigo}}|${{row.descricao}}`;
-                if (!totaisData[key]) {{
-                    totaisData[key] = {{ grupo: row.grupo, codigo: row.codigo, desc: row.descricao, v2024: 0, v2025: 0, rend: 0 }};
+                const key = row.grupo + '|' + row.codigo;
+                if (!totais[key]) {{
+                    totais[key] = {{
+                        grupo: row.grupo,
+                        codigo: row.codigo,
+                        descricao: row.descricao,
+                        v2024: 0,
+                        v2025: 0,
+                        rendimento: 0
+                    }};
                 }}
-                totaisData[key].v2024 += row.v2024;
-                totaisData[key].v2025 += row.v2025;
-                totaisData[key].rend += row.rendimento;
+                totais[key].v2024 += row.v2024;
+                totais[key].v2025 += row.v2025;
+                totais[key].rendimento += row.rendimento;
             }});
-
-            const sorted = Object.values(totaisData).sort((a, b) => {{
-                if (a.grupo !== b.grupo) return (a.grupo || 'zzz').localeCompare(b.grupo || 'zzz');
-                return a.codigo.localeCompare(b.codigo);
-            }});
-
-            let totalGeral2024 = 0, totalGeral2025 = 0, totalGeralRend = 0;
-
-            sorted.forEach(row => {{
+            
+            const tbodyTotais = document.getElementById('tbody-totais');
+            Object.values(totais).forEach(row => {{
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${{row.grupo || '-'}}</td>
                     <td>${{row.codigo}}</td>
-                    <td>${{row.desc}}</td>
+                    <td>${{row.descricao}}</td>
                     <td class="currency">${{formatCurrency(row.v2024)}}</td>
                     <td class="currency">${{formatCurrency(row.v2025)}}</td>
-                    <td class="currency">${{formatCurrency(row.rend)}}</td>
+                    <td class="currency">${{formatCurrency(row.rendimento)}}</td>
                 `;
-                tbody.appendChild(tr);
-
-                totalGeral2024 += row.v2024;
-                totalGeral2025 += row.v2025;
-                totalGeralRend += row.rend;
+                tbodyTotais.appendChild(tr);
             }});
 
-            // Total Row
-            const trTotal = document.createElement('tr');
-            trTotal.className = 'total-row';
-            trTotal.innerHTML = `
-                <td colspan="3"><strong>TOTAL GERAL</strong></td>
-                <td class="currency"><strong>${{formatCurrency(totalGeral2024)}}</strong></td>
-                <td class="currency"><strong>${{formatCurrency(totalGeral2025)}}</strong></td>
-                <td class="currency"><strong>${{formatCurrency(totalGeralRend)}}</strong></td>
-            `;
-            tbody.appendChild(trTotal);
+            // Tab 4: Para IRPF
+            gerarTabelasIRPF();
         }}
 
-        // Populate Para IRPF
-        function populaParaIRPF() {{
-            const container = document.getElementById('irpf-content');
-            const irpfData = {{}};
+        // Chart Configuration based on theme
+        let chartInstance1 = null;
+        let chartInstance2 = null;
 
-            mockData.forEach(row => {{
-                if (!irpfData[row.instituicao]) {{
-                    irpfData[row.instituicao] = {{}};
-                }}
-                if (!irpfData[row.instituicao][row.secao]) {{
-                    irpfData[row.instituicao][row.secao] = [];
-                }}
-                irpfData[row.instituicao][row.secao].push(row);
-            }});
-
-            let html = '';
-            let totalAllInst2024 = 0, totalAllInst2025 = 0, totalAllInstRend = 0;
-
-            Object.keys(irpfData).sort().forEach(inst => {{
-                let instTotal2024 = 0, instTotal2025 = 0, instTotalRend = 0;
-                html += `<div class="section-header">${{inst}}</div>`;
-                html += '<table class="table table-sm"><thead><tr><th>Seção</th><th>Grupo</th><th>Código</th><th>Descrição</th><th class="currency">2024</th><th class="currency">2025</th><th class="currency">Rendimento</th></tr></thead><tbody>';
-
-                Object.keys(irpfData[inst]).sort().forEach(secao => {{
-                    irpfData[inst][secao].forEach(row => {{
-                        html += `<tr><td>${{row.secao}}</td><td>${{row.grupo || '-'}}</td><td>${{row.codigo}}</td><td>${{row.descricao}}</td><td class="currency">${{formatCurrency(row.v2024)}}</td><td class="currency">${{formatCurrency(row.v2025)}}</td><td class="currency">${{formatCurrency(row.rendimento)}}</td></tr>`;
-                        instTotal2024 += row.v2024;
-                        instTotal2025 += row.v2025;
-                        instTotalRend += row.rendimento;
-                    }});
-                }});
-
-                html += `<tr style="background-color: #e8e8e8;"><td colspan="4"><strong>Subtotal ${{inst}}</strong></td><td class="currency">${{formatCurrency(instTotal2024)}}</td><td class="currency">${{formatCurrency(instTotal2025)}}</td><td class="currency">${{formatCurrency(instTotalRend)}}</td></tr>`;
-                html += '</tbody></table>';
-
-                totalAllInst2024 += instTotal2024;
-                totalAllInst2025 += instTotal2025;
-                totalAllInstRend += instTotalRend;
-            }});
-
-            html += `<div class="section-header mt-4">TOTAL GERAL</div>`;
-            html += `<p><strong>2024:</strong> ${{formatCurrency(totalAllInst2024)}} | <strong>2025:</strong> ${{formatCurrency(totalAllInst2025)}} | <strong>Rendimentos:</strong> ${{formatCurrency(totalAllInstRend)}}</p>`;
-
-            container.innerHTML = html;
+        function getChartColors(isDark) {{
+            return {{
+                text: isDark ? '#e0e0e0' : '#333333',
+                grid: isDark ? '#3d3d3d' : '#e9ecef',
+                primary: '#667eea',
+                secondary: '#764ba2'
+            }};
         }}
 
-        // Initialize Charts
-        function initCharts() {{
-            // Chart 1: Distribution by Institution
-            const instData = {{}};
+        function updateCharts(theme) {{
+            const isDark = theme === 'dark';
+            const colors = getChartColors(isDark);
+            
+            if (chartInstance1) {{
+                chartInstance1.options.plugins.legend.labels.color = colors.text;
+                chartInstance1.options.plugins.tooltip.bodyColor = colors.text;
+                chartInstance1.update();
+            }}
+            
+            if (chartInstance2) {{
+                chartInstance2.options.scales.y.ticks.color = colors.text;
+                chartInstance2.options.scales.x.ticks.color = colors.text;
+                chartInstance2.options.scales.y.grid.color = colors.grid;
+                chartInstance2.options.plugins.legend.labels.color = colors.text;
+                chartInstance2.update();
+            }}
+        }}
+
+        function createCharts() {{
+            const isDark = document.documentElement.classList.contains('dark-mode');
+            const colors = getChartColors(isDark);
+
+            // Prepare data
+            const institutions = {{}};
             mockData.forEach(row => {{
-                if (!instData[row.instituicao]) instData[row.instituicao] = 0;
-                instData[row.instituicao] += row.v2025;
+                if (!institutions[row.instituicao]) {{
+                    institutions[row.instituicao] = 0;
+                }}
+                institutions[row.instituicao] += row.v2025;
             }});
 
-            new Chart(document.getElementById('chartInstitution'), {{
-                type: 'pie',
+            // Chart 1: Institution Distribution
+            const ctx1 = document.getElementById('chartInstitution').getContext('2d');
+            chartInstance1 = new Chart(ctx1, {{
+                type: 'doughnut',
                 data: {{
-                    labels: Object.keys(instData),
+                    labels: Object.keys(institutions),
                     datasets: [{{
-                        data: Object.values(instData),
-                        backgroundColor: ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b']
+                        data: Object.values(institutions),
+                        backgroundColor: [
+                            '#667eea', '#764ba2', '#f093fb', '#4facfe',
+                            '#43e97b', '#fa709a', '#30cfd0', '#a8edea'
+                        ]
                     }}]
                 }},
                 options: {{
                     responsive: true,
-                    maintainAspectRatio: false,
+                    maintainAspectRatio: true,
                     plugins: {{
-                        legend: {{ position: 'bottom' }},
+                        legend: {{
+                            labels: {{ color: colors.text }}
+                        }},
                         tooltip: {{
-                            callbacks: {{
-                                label: function(context) {{
-                                    return formatCurrency(context.parsed);
-                                }}
-                            }}
+                            bodyColor: colors.text,
+                            backgroundColor: isDark ? '#2d2d2d' : '#ffffff'
                         }}
                     }}
                 }}
             }});
 
-            // Chart 2: Evolution 2024 vs 2025
-            const secaoData = {{}};
+            // Chart 2: Evolution
+            const ctx2 = document.getElementById('chartEvolution').getContext('2d');
+            const evolution = {{}};
             mockData.forEach(row => {{
-                if (!secaoData[row.instituicao]) secaoData[row.instituicao] = {{ 2024: 0, 2025: 0 }};
-                secaoData[row.instituicao]['2024'] += row.v2024;
-                secaoData[row.instituicao]['2025'] += row.v2025;
+                if (!evolution[row.instituicao]) {{
+                    evolution[row.instituicao] = {{ v2024: 0, v2025: 0 }};
+                }}
+                evolution[row.instituicao].v2024 += row.v2024;
+                evolution[row.instituicao].v2025 += row.v2025;
             }});
 
-            new Chart(document.getElementById('chartEvolution'), {{
+            chartInstance2 = new Chart(ctx2, {{
                 type: 'bar',
                 data: {{
-                    labels: Object.keys(secaoData),
+                    labels: Object.keys(evolution),
                     datasets: [
                         {{
                             label: '2024',
-                            data: Object.values(secaoData).map(d => d['2024']),
+                            data: Object.values(evolution).map(e => e.v2024),
                             backgroundColor: '#667eea'
                         }},
                         {{
                             label: '2025',
-                            data: Object.values(secaoData).map(d => d['2025']),
+                            data: Object.values(evolution).map(e => e.v2025),
                             backgroundColor: '#764ba2'
                         }}
                     ]
                 }},
                 options: {{
                     responsive: true,
-                    maintainAspectRatio: false,
+                    maintainAspectRatio: true,
                     scales: {{
-                        y: {{ beginAtZero: true, ticks: {{ callback: v => formatCurrency(v) }} }}
+                        y: {{
+                            ticks: {{ color: colors.text }},
+                            grid: {{ color: colors.grid }}
+                        }},
+                        x: {{
+                            ticks: {{ color: colors.text }},
+                            grid: {{ color: colors.grid }}
+                        }}
                     }},
                     plugins: {{
+                        legend: {{
+                            labels: {{ color: colors.text }}
+                        }},
                         tooltip: {{
-                            callbacks: {{
-                                label: function(context) {{
-                                    return formatCurrency(context.parsed.y);
-                                }}
-                            }}
+                            bodyColor: colors.text,
+                            backgroundColor: isDark ? '#2d2d2d' : '#ffffff'
                         }}
                     }}
                 }}
             }});
         }}
 
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', function() {{
-            populateDadosBrutos();
-            populateResumo();
-            populateTotais();
-            populaParaIRPF();
-            initCharts();
+        // Generate IRPF Tables grouped by Instituição (Broker)
+        function gerarTabelasIRPF() {{
+            const irpfContent = document.getElementById('irpf-content');
+            
+            // Group by Instituição, then by Seção
+            const instituicoes = {{}};
+            let totalGeral = {{ v2024: 0, v2025: 0, rendimento: 0, irrf: 0 }};
+            
+            mockData.forEach(row => {{
+                if (!instituicoes[row.instituicao]) {{
+                    instituicoes[row.instituicao] = {{}};
+                }}
+                if (!instituicoes[row.instituicao][row.secao]) {{
+                    instituicoes[row.instituicao][row.secao] = [];
+                }}
+                instituicoes[row.instituicao][row.secao].push(row);
+                
+                // Accumulate totals
+                totalGeral.v2024 += row.v2024 || 0;
+                totalGeral.v2025 += row.v2025 || 0;
+                totalGeral.rendimento += row.rendimento || 0;
+                totalGeral.irrf += row.irrf || 0;
+            }});
+
+            // Sort instituições alphabetically
+            const sortedInstitucoes = Object.keys(instituicoes).sort();
+            
+            sortedInstitucoes.forEach(instituicao => {{
+                // Institution header
+                const instDiv = document.createElement('div');
+                instDiv.className = 'institution-header';
+                instDiv.style.marginTop = '20px';
+                instDiv.style.marginBottom = '10px';
+                instDiv.style.fontSize = '18px';
+                instDiv.style.fontWeight = 'bold';
+                instDiv.style.color = 'var(--primary-color)';
+                instDiv.style.borderBottom = '2px solid var(--primary-color)';
+                instDiv.style.paddingBottom = '5px';
+                instDiv.textContent = instituicao.toUpperCase();
+                irpfContent.appendChild(instDiv);
+
+                const instData = instituicoes[instituicao];
+                const sortedSecoes = Object.keys(instData).sort();
+                let instTotal = {{ v2024: 0, v2025: 0, rendimento: 0, irrf: 0 }};
+                
+                // For each seção within this instituição
+                sortedSecoes.forEach(secao => {{
+                    const secaoRows = instData[secao];
+                    
+                    // Section subheader
+                    const secaoDiv = document.createElement('div');
+                    secaoDiv.style.marginTop = '10px';
+                    secaoDiv.style.marginBottom = '5px';
+                    secaoDiv.style.fontSize = '14px';
+                    secaoDiv.style.fontWeight = '600';
+                    secaoDiv.style.color = 'var(--secondary-color)';
+                    secaoDiv.textContent = secao;
+                    irpfContent.appendChild(secaoDiv);
+
+                    const table = document.createElement('table');
+                    table.className = 'table table-sm table-striped';
+                    table.style.marginBottom = '15px';
+                    table.innerHTML = `
+                        <thead>
+                            <tr style="background-color: var(--table-header-light);">
+                                <th>Grupo</th>
+                                <th>Código</th>
+                                <th>Descrição</th>
+                                <th class="currency">2024 (R$)</th>
+                                <th class="currency">2025 (R$)</th>
+                                <th class="currency">Rendimento (R$)</th>
+                                <th class="currency">IRRF (R$)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${{secaoRows.map(r => {{
+                                instTotal.v2024 += r.v2024 || 0;
+                                instTotal.v2025 += r.v2025 || 0;
+                                instTotal.rendimento += r.rendimento || 0;
+                                instTotal.irrf += r.irrf || 0;
+                                return `
+                                    <tr>
+                                        <td>${{r.grupo || '-'}}</td>
+                                        <td>${{r.codigo}}</td>
+                                        <td>${{r.descricao}}</td>
+                                        <td class="currency">${{formatCurrency(r.v2024)}}</td>
+                                        <td class="currency">${{formatCurrency(r.v2025)}}</td>
+                                        <td class="currency">${{formatCurrency(r.rendimento)}}</td>
+                                        <td class="currency">${{formatCurrency(r.irrf)}}</td>
+                                    </tr>
+                                `;
+                            }}).join('')}}
+                        </tbody>
+                    `;
+                    irpfContent.appendChild(table);
+                }});
+                
+                // Institution subtotal
+                const instSubtotalDiv = document.createElement('div');
+                instSubtotalDiv.style.display = 'grid';
+                instSubtotalDiv.style.gridTemplateColumns = 'repeat(7, 1fr)';
+                instSubtotalDiv.style.gap = '5px';
+                instSubtotalDiv.style.marginBottom = '20px';
+                instSubtotalDiv.style.fontWeight = 'bold';
+                instSubtotalDiv.style.padding = '10px';
+                instSubtotalDiv.style.backgroundColor = 'var(--bg-light-card)';
+                instSubtotalDiv.style.border = '1px solid var(--border-light)';
+                instSubtotalDiv.innerHTML = `
+                    <div style="grid-column: 1/4;">Subtotal ${{instituicao}}</div>
+                    <div class="currency" style="textAlign: right;">${{formatCurrency(instTotal.v2024)}}</div>
+                    <div class="currency" style="textAlign: right;">${{formatCurrency(instTotal.v2025)}}</div>
+                    <div class="currency" style="textAlign: right;">${{formatCurrency(instTotal.rendimento)}}</div>
+                    <div class="currency" style="textAlign: right;">${{formatCurrency(instTotal.irrf)}}</div>
+                `;
+                irpfContent.appendChild(instSubtotalDiv);
+            }});
+            
+            // Grand Total
+            const grandTotalDiv = document.createElement('div');
+            grandTotalDiv.style.display = 'grid';
+            grandTotalDiv.style.gridTemplateColumns = 'repeat(7, 1fr)';
+            grandTotalDiv.style.gap = '5px';
+            grandTotalDiv.style.marginTop = '30px';
+            grandTotalDiv.style.fontWeight = 'bold';
+            grandTotalDiv.style.fontSize = '16px';
+            grandTotalDiv.style.padding = '10px';
+            grandTotalDiv.style.backgroundColor = 'var(--primary-color)';
+            grandTotalDiv.style.color = 'white';
+            grandTotalDiv.style.border = '2px solid var(--secondary-color)';
+            grandTotalDiv.innerHTML = `
+                <div style="grid-column: 1/4;">TOTAL GERAL</div>
+                <div class="currency" style="textAlign: right;">${{formatCurrency(totalGeral.v2024)}}</div>
+                <div class="currency" style="textAlign: right;">${{formatCurrency(totalGeral.v2025)}}</div>
+                <div class="currency" style="textAlign: right;">${{formatCurrency(totalGeral.rendimento)}}</div>
+                <div class="currency" style="textAlign: right;">${{formatCurrency(totalGeral.irrf)}}</div>
+            `;
+            irpfContent.appendChild(grandTotalDiv);
+        }}
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', function() {{
+            initializeTheme();
+            populateTabs();
+            createCharts();
         }});
     </script>
 </body>
 </html>
 '''
     
+    # Write to file
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(html_content)
-    
-    print(f"✅ Dashboard gerado: {output_path}")
-    print(f"   Entradas: {len(entries)}")
-    print(f"   Total 2024: {format_currency(total_2024)}")
-    print(f"   Total 2025: {format_currency(total_2025)}")
-    print(f"   Total Rendimentos: {format_currency(total_rendimento)}")
-
-
-if __name__ == '__main__':
-    # Example: Generate from test_integration mock data
-    from test_integration import MOCK_ENTRIES
-    
-    generate_dashboard_html(MOCK_ENTRIES, 'dashboard.html')
-    print("\n💡 Abra 'dashboard.html' em seu navegador para visualizar o dashboard!")
+    print(f'  Dashboard gerado em: {output_path} (com Dark Mode 🌙)')

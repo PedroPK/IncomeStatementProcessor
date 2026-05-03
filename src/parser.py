@@ -20,12 +20,17 @@ from src.normalizer import parse_brl, find_cnpj, clean, extract_year
 
 # ── Institution detection ─────────────────────────────────────────────────────
 
+
+# ── Institution detection ─────────────────────────────────────────────────────
+
 def detect_institution(filename: str, first_page: str) -> str:
     fname = filename.lower()
     text = (first_page or '').lower()
 
     if 'accenture' in fname:
         return 'accenture'
+    if 'clear' in fname or 'www.clear.com.br' in text:
+        return 'clear'
     if 'nubank' in fname or 'nu bank' in fname:
         return 'nubank'
     if ('xp' in fname and 'prev' in fname) or 'previd' in fname:
@@ -77,6 +82,7 @@ def parse_file(filepath: str) -> list[Entry]:
         'xp': parse_xp,
         'avenue': parse_avenue,
         'inter': parse_inter,
+        'clear': parse_clear,
     }
 
     parser_fn = parsers.get(institution)
@@ -279,7 +285,8 @@ def _xp_parse_page1(filename, text, inst, cnpj, ano, cnpj_names):
                 cur_inst = clean(m_inst.group(1))
                 cur_cnpj = m_inst.group(2)
                 continue
-            if v24 + v25 + rend == 0 and desc.startswith('-'):
+            # Skip rows with zero values (nothing to report)
+            if v24 + v25 + rend == 0:
                 continue
             entries.append(_entry(
                 filename, cur_inst, cnpj, ano,
@@ -527,6 +534,137 @@ def parse_xp_previdencia(filename: str, pages_text: list[str],
                 valor_2025=parse_brl(m.group(1)), tipo_rendimento='Dedução',
             ))
 
+    return entries
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CLEAR  (Informe padrão Ministério da Economia – reutiliza lógica XP)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def parse_clear(filename: str, pages_text: list[str],
+                pages_tables: list[list]) -> list[Entry]:
+    """
+    Parse Clear broker documents: Informe de Rendimentos or Custódia (Assets).
+    
+    Clear offers investment brokerage through XP's infrastructure, supporting:
+    1. "Informe de Rendimentos" - uses standard "Informe de Rendimentos" format
+    2. "Custódia" - detailed asset position with holdings breakdown
+    """
+    from dataclasses import replace
+    
+    full_text = '\n'.join(pages_text).lower()
+    
+    # Detect document type
+    if 'custódia' in full_text or 'custod' in full_text:
+        # Parse custody/assets document
+        entries = _parse_clear_custodia(filename, pages_text, pages_tables)
+    else:
+        # Use the same parsing logic as XP since Clear uses the standard format
+        entries = parse_xp(filename, pages_text, pages_tables)
+    
+    # Update institution name to "Clear" while preserving other parsed data
+    entries = [replace(e, instituicao='Clear') for e in entries]
+    
+    return entries
+
+
+def _parse_clear_custodia(filename: str, pages_text: list[str],
+                          pages_tables: list[list]) -> list[Entry]:
+    """
+    Parse Clear custody document (Posição Consolidada de Ativos).
+    
+    Extracts individual security holdings (ações, FIIs, ETFs, etc.)
+    and calculates their values based on market prices.
+    """
+    entries: list[Entry] = []
+    full_text = '\n'.join(pages_text)
+    inst = 'Clear'
+    ano = extract_year(full_text)
+    primary_cnpj = ''  # Clear doesn't provide CNPJ in custody docs
+    
+    # ── Classifier helper ────────────────────────────────────────────────────
+    def classify_asset_type(ticker: str) -> tuple[str, str]:
+        """Classify asset type by ticker pattern.
+        
+        Returns: (group, codigo, codigo_desc)
+        - FII/ETF: ends with 11, 13, 21, 24, 39, 65
+        - Ação: others
+        """
+        ticker_upper = ticker.strip().upper()
+        # Check last 2-3 chars for FII/ETF pattern
+        if len(ticker_upper) >= 4:
+            last_chars = ticker_upper[-2:]
+            if last_chars in ('11', '13', '21', '24', '39', '65'):
+                return ('07', '99', 'Fundos de Investimento')  # FII/ETF
+        # Default: Ação
+        return ('04', '01', 'Ações')
+    
+    # ── Parse asset tables ───────────────────────────────────────────────────
+    # Tables contain rows with: ticker, qty, prices, position value
+    for page_idx, page_tables in enumerate(pages_tables):
+        for table in page_tables:
+            for row_idx, row in enumerate(table):
+                if not row or len(row) < 2:
+                    continue
+                
+                ticker = str(row[0] or '').strip()
+                
+                # Skip header/footer rows
+                if not ticker or ticker.lower() in ('ativo', 'ticker', 'posição',
+                                                      'total', 'saldo', 'disponível'):
+                    continue
+                
+                # Validate ticker format (usually 4-6 chars: ABCD3, ABCD11, etc)
+                if not re.match(r'^[A-Z]{2,4}[0-9]{1,3}$', ticker):
+                    continue
+                
+                # Extract position value (last numeric column)
+                position_value = 0.0
+                for cell in reversed(row):
+                    val = parse_brl(str(cell or ''))
+                    if val > 0:
+                        position_value = val
+                        break
+                
+                if position_value == 0:
+                    continue
+                
+                # Classify and create entry
+                grupo, codigo, codigo_desc = classify_asset_type(ticker)
+                grupo_desc = _grupo_desc(grupo)
+                
+                entries.append(_entry(
+                    filename, inst, primary_cnpj, ano,
+                    'Bens e Direitos', grupo, grupo_desc, codigo, codigo_desc,
+                    fonte_pagadora=inst,
+                    cnpj_fonte=primary_cnpj,
+                    localizacao='105 - Brasil',
+                    discriminacao=f'{ticker} - Ativo em Custódia',
+                    valor_2024=0.0,
+                    valor_2025=position_value,
+                    rendimento=0.0,
+                ))
+    
+    # ── Parse saldo disponível (cash) ──────────────────────────────────────
+    # Look for "Saldo em Conta", "Disponível", etc. patterns
+    saldo_pattern = r'(?:Saldo|Disponível|Em\s+Conta)[^\n]*?R\$\s*([\d.]+,\d{2})'
+    for m in re.finditer(saldo_pattern, full_text, re.IGNORECASE):
+        saldo_value = parse_brl(m.group(1))
+        if saldo_value > 0:
+            entries.append(_entry(
+                filename, inst, primary_cnpj, ano,
+                'Bens e Direitos', '06', _grupo_desc('06'), '01',
+                'Depósito em conta corrente ou conta pagamento',
+                fonte_pagadora=inst,
+                cnpj_fonte=primary_cnpj,
+                localizacao='105 - Brasil',
+                discriminacao='Saldo disponível - Clear',
+                valor_2024=0.0,
+                valor_2025=saldo_value,
+                rendimento=0.0,
+            ))
+            break  # Only add once
+    
     return entries
 
 

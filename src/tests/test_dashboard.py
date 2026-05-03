@@ -14,7 +14,8 @@ import json
 from pathlib import Path
 from src.dashboard_generator import generate_dashboard_html
 from src.models import Entry
-from test_integration import MOCK_ENTRIES
+from . import test_integration
+from .test_integration import MOCK_ENTRIES
 
 
 # ── Extended Test Data ────────────────────────────────────────────────────────
@@ -438,6 +439,41 @@ def test_dashboard_section_aggregation():
         return True
 
 
+def test_dashboard_dark_mode():
+    """Test that dark mode CSS variables and toggle functionality exist."""
+    print("🧪 Test 11: Dark Mode Support")
+    
+    with tempfile.TemporaryDirectory() as tmpdir:
+        output_path = Path(tmpdir) / 'test_dashboard_dark.html'
+        generate_dashboard_html(MOCK_ENTRIES, str(output_path))
+        
+        content = output_path.read_text(encoding='utf-8')
+        
+        # Check for CSS variables (light and dark modes)
+        assert '--primary-color' in content, "CSS variables not defined"
+        assert '--bg-light' in content, "Background color variable not defined"
+        assert '--text-light' in content, "Text color variable not defined"
+        assert 'dark-mode' in content, "Dark mode class not defined"
+        
+        # Check for theme toggle functionality
+        assert 'toggleTheme' in content, "toggleTheme function not found"
+        assert 'localStorage' in content, "localStorage persistence not found"
+        assert 'theme-toggle' in content, "Theme toggle button not found"
+        assert 'theme-icon' in content, "Theme icon element not found"
+        
+        # Check for dark mode styles
+        assert 'html.dark-mode' in content, "Dark mode CSS rules not found"
+        
+        # Verify light mode initialization
+        assert 'initializeTheme' in content, "Theme initialization function not found"
+        
+        print("  ✅ Dark mode CSS variables configured")
+        print("  ✅ Theme toggle button implemented")
+        print("  ✅ localStorage persistence enabled")
+        print("  ✅ Light/Dark mode detection working")
+        return True
+
+
 def run_all_tests():
     """Run all dashboard tests."""
     print("\n" + "=" * 70)
@@ -455,6 +491,7 @@ def run_all_tests():
         test_dashboard_currency_formatting,
         test_dashboard_all_institutions,
         test_dashboard_section_aggregation,
+        test_dashboard_dark_mode,
     ]
     
     results = []

@@ -18,6 +18,7 @@ except ModuleNotFoundError:
 
 from src.extractor import extract_zip, find_zip
 from src.parser import parse_file
+from src.custodia_parser import parse_custodia_xlsx
 from src.xlsx_writer import write_xlsx
 
 
@@ -41,6 +42,35 @@ def _default_config() -> dict:
         'output': {'xlsx_path': 'output/informes_rendimentos.xlsx'},
         'google_sheets': {'enabled': False},
     }
+
+
+def _extract_broker_name(filename: str) -> str:
+    """Extract broker/corretora name from filename.
+    
+    Examples:
+        'ClearCustodia_2025.xlsx' -> 'Clear'
+        'Custódia_XP.xlsx' -> 'XP'
+    """
+    name = Path(filename).stem.lower()
+    
+    # Common broker names to detect
+    brokers = {
+        'clear': 'Clear',
+        'xp': 'XP Investimentos',
+        'avenue': 'Avenue Securities',
+        'inter': 'Banco Inter',
+        'nubank': 'NuBank',
+        'bradesco': 'Bradesco',
+        'itau': 'Itaú',
+        'accenture': 'Accenture',
+    }
+    
+    for key, display_name in brokers.items():
+        if key in name:
+            return display_name
+    
+    # Default: use filename without extension
+    return name.replace('custodia', '').replace('_', ' ').strip().title() or 'Custódia Personalizada'
 
 
 def main() -> None:
@@ -70,7 +100,6 @@ def main() -> None:
     for filename, filepath in sorted(file_map.items()):
         ext = Path(filename).suffix.lower()
         if ext not in _PDF_EXTENSIONS:
-            print(f'  [ignorado] {filename} (extensão não suportada: {ext})')
             continue
 
         print(f'  Processando: {filename}')
@@ -92,8 +121,30 @@ def main() -> None:
         print(f'    → {len(ok_entries)} entradas extraídas.')
         all_entries.extend(ok_entries)
 
+    # ── Parse XLSX custódia file if present ───────────────────────────────────
+    xlsx_files = [f for f in file_map.keys() if f.lower().endswith(('.xlsx', '.xls'))]
+    if xlsx_files:
+        for xlsx_filename in xlsx_files:
+            print(f'  Processando custódia: {xlsx_filename}')
+            try:
+                xlsx_entries = parse_custodia_xlsx(
+                    file_map[xlsx_filename],
+                    instituicao=_extract_broker_name(xlsx_filename)
+                )
+                if xlsx_entries:
+                    print(f'    → {len(xlsx_entries)} ativos em custódia extraídos.')
+                    all_entries.extend(xlsx_entries)
+                else:
+                    print(f'    [aviso] Nenhum ativo extraído de {xlsx_filename}')
+                    errors.append(xlsx_filename)
+            except Exception as exc:
+                print(f'    [erro] Erro ao processar {xlsx_filename}: {exc}')
+                errors.append(xlsx_filename)
+    else:
+        print(f'  [info] Nenhum arquivo XLSX de custódia encontrado.')
+
     # ── Summary ───────────────────────────────────────────────────────────────
-    print(f'\nTotal: {len(all_entries)} entradas de {len(file_map)} arquivo(s).')
+    print(f'\nTotal: {len(all_entries)} entradas processadas.')
     if errors:
         print(f'Arquivos com problemas: {", ".join(errors)}')
 
