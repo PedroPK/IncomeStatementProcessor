@@ -4,28 +4,33 @@ Ferramenta Python para extrair, processar e consolidar Informes de Rendimentos (
 
 ## 📋 Funcionalidades
 
-- **Extração de múltiplos formatos PDF**: Suporte nativo para 7 instituições:
-  - Accenture (Comprovante de Rendimentos)
-  - Avenue Securities (Ativos em custódia + depósitos)
-  - Clear (Fundos + renda fixa + Tesouro Direto)
-  - Inter (Renda fixa + criptoativos)
-  - NuBank (Renda fixa + fundos)
-  - XP Investimentos (Fundos + renda fixa + Tesouro Direto)
-  - XP Vida e Previdência (VGBL/PGBL)
+- **Extração de múltiplos formatos**: 
+  - ✅ PDFs: Suporte nativo para 7 instituições
+    - Accenture (Comprovante de Rendimentos)
+    - Avenue Securities (Ativos em custódia + depósitos)
+    - Clear (Fundos + renda fixa + Tesouro Direto + Custódia de Ativos)
+    - Inter (Renda fixa + criptoativos)
+    - NuBank (Renda fixa + fundos)
+    - XP Investimentos (Fundos + renda fixa + Tesouro Direto)
+    - XP Vida e Previdência (VGBL/PGBL)
+  - ✨ **NOVO**: XLSX com dados de custódia (ativos, quantidades, preços médios)
 
 - **Processamento robusto**:
   - Detecção automática de instituição por nome de arquivo
   - Leitura de ZIP com suporte a codificação UTF-8 e CP437
   - Extração de tabelas PDF (pdfplumber) + análise de texto
+  - ✨ **NOVO**: Processamento de XLSX e cálculo automático de custo de aquisição
   - Normalização de valores monetários brasileiros (1.234,56 → 1234.56)
   - Localização de CPF/CNPJ via regex
 
 - **Saída estruturada (XLSX)**:
-  - **Dados Brutos**: Todas as 59 entradas com 19 colunas
+  - **Dados Brutos**: Todas as entradas com 19 colunas
   - **Resumo**: Pivot por Seção × Grupo/Código × Instituição
   - **Totais**: Agregação por grupo com linha de total
   - **Para IRPF**: Formatado por instituição com separadores de seção
+  - ✨ **NOVO**: Inclui dados de custódia processados
 
+- **Dashboard Interativo HTML**: Visualização de dados com gráficos e múltiplas abas
 - **Exportação opcional para Google Sheets** (via config `google_sheets.enabled`)
 
 ## 🚀 Instalação
@@ -53,18 +58,47 @@ pip install -r requirements.txt
 
 ### 1. Preparar dados de entrada
 
+#### PDFs (Informes de Rendimentos)
 - Coloque os PDFs em um ZIP na pasta `input/`
-- Ou coloque um ZIP denominado `*.zip` em `input/`
 - Nomes de arquivo esperados (sistema detecta automaticamente):
   ```
-  Accenture*.aspx
+  Accenture - Informe*.aspx
   Avenue*.pdf
-  Clear*.pdf
+  Clear - 01 Informe*.pdf
+  Clear - 04 Custódia*.pdf
   Inter*.pdf
   NuBank*.pdf
-  XP*.pdf          (main report)
+  XP - Informe*.pdf
   XP*Previdência*.pdf
   ```
+
+#### ✨ XLSX com Dados de Custódia (NOVO)
+Inclua no ZIP um arquivo XLSX com a estrutura:
+
+**Colunas obrigatórias:**
+- **Coluna A (Ativo)**: Ticker do ativo (ex: PSSA3, PLAG11, AAPL34)
+- **Coluna B (Quantidade de Cotas)**: Número de cotas/ações (ex: 100, 50.5)
+- **Coluna C (Preço Médio)**: Preço unitário em BRL (ex: 45.50, 120.00)
+
+**Exemplo de arquivo `ClearCustodia.xlsx`:**
+
+| Ativo | Quantidade de Cotas | Preço Médio |
+|-------|-------------------|------------|
+| PSSA3 | 400 | 48.36 |
+| PLAG11 | 81 | 120.80 |
+| AAPL34 | 10 | 215.50 |
+
+**Resultado esperado no XLSX final:**
+- Entry para cada ativo
+- Campo `valor_2025` = Quantidade × Preço Médio
+- Grupo/Código mapeado automaticamente por tipo de ativo
+- Observação com detalhes da custódia
+
+**Nomes de arquivo suportados:**
+- `Clear_Custodia.xlsx`
+- `ClearCustodia_2025.xlsx`
+- `Custódia_Clear.xlsx`
+- Qualquer `*Custodia*.xlsx` ou `*custodia*.xlsx`
 
 ### 2. Configurar (opcional)
 
@@ -72,6 +106,7 @@ Edite `config.toml`:
 ```toml
 [output]
 xlsx_path = "output/informes_rendimentos.xlsx"
+dashboard_path = "dashboard.html"
 
 [google_sheets]
 enabled = false  # true para exportar para Sheets
@@ -88,13 +123,19 @@ python3 -m src.main
 
 Saída esperada:
 ```
-ZIP encontrado: input/drive-download-20260502T172444Z-3-001.zip
+ZIP encontrado: input/input.zip
 Extraindo arquivos...
-  6 arquivo(s) extraído(s).
+  7 arquivo(s) extraído(s).
   Processando: Accenture - Informe de Rendimentos...
     → 5 entradas extraídas.
-  ...
-Total: 59 entradas de 6 arquivo(s).
+  Processando: Clear - 01 Informe...
+    → 8 entradas extraídas.
+  Processando custódia: ClearCustodia.xlsx
+    ✅ PSSA3: 400 cotas × R$ 48,36 = R$ 19.344,00
+    ✅ PLAG11: 81 cotas × R$ 120,80 = R$ 9.784,80
+    → 3 ativos em custódia extraídos.
+  
+  Total: 59 entradas processadas.
 
 Gerando planilha XLSX...
   Planilha salva em: output/informes_rendimentos.xlsx
@@ -147,6 +188,8 @@ output/informes_rendimentos.xlsx
     ↓ (se enabled)
 [sheets_writer.py] → gspread + OAuth2 → Google Sheets
 ```
+
+Para detalhes completos de arquitetura, veja [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ### Módulos
 
@@ -301,6 +344,27 @@ O projeto gera automaticamente um **dashboard HTML interativo** que visualiza os
 - **Métricas-Chave**: Cards destacando Total 2024, Total 2025, Rendimentos, Quantidade de Entradas
 - **Tabelas Responsivas**: Currency formatting automático (Intl.NumberFormat pt-BR)
 - **Bootstrap 5.3**: Design profissional e mobile-friendly
+- **🌙 Dark Mode**: Tema escuro completo com toggle button
+  - CSS Variables para fácil customização
+  - Persistência de preferência via localStorage
+  - Cores otimizadas para redução de fadiga ocular
+  - Transições suaves entre temas
+
+### Dark Mode
+
+O dashboard inclui suporte nativo para modo escuro/noturno:
+
+**Ativar Dark Mode:**
+- Clique no botão **"🌙 Dark Mode"** no navbar
+- A preferência é salva automaticamente (localStorage)
+- Ao reabrir o dashboard, mantém seu tema anterior
+
+**Características:**
+- Light mode: Background claro, texto escuro
+- Dark mode: Background escuro (#1a1a1a), texto claro (#e0e0e0)
+- Transições suaves de 300ms entre temas
+- Gráficos com cores dinâmicas adaptadas ao tema
+- Totalmente acessível e responsivo
 
 ### Visualização
 
@@ -348,8 +412,9 @@ dashboard_path = "output/dashboard.html"
 ### 📚 Documentação Completa do Dashboard
 
 Para uma visualização completa com exemplos de dados, veja:
-- **[DASHBOARD_VISUAL.md](DASHBOARD_VISUAL.md)** — Tabelas e exemplos de todas as 4 abas
-- **[DASHBOARD.md](DASHBOARD.md)** — Arquitetura, customização e API
+- **[docs/DASHBOARD_VISUAL.md](docs/DASHBOARD_VISUAL.md)** — Tabelas e exemplos de todas as 4 abas
+- **[docs/DASHBOARD.md](docs/DASHBOARD.md)** — Arquitetura, customização e API
+- **[docs/DASHBOARD_SESSION.md](docs/DASHBOARD_SESSION.md)** — Sessões e persistência de dados
 - **[examples/README.md](examples/README.md)** — 5 cenários de uso práticos
 
 ## 🧪 Testes Automatizados
@@ -357,22 +422,22 @@ Para uma visualização completa com exemplos de dados, veja:
 O projeto inclui testes de integração com dados mockados que cobrem o pipeline completo:
 
 ```bash
-# Executar testes de integração
-python3 test_integration.py
+# Executar testes de integração (mock data)
+python3 -m src.tests.test_integration
 
 # Executar testes do dashboard
-python3 test_dashboard.py
+python3 -m src.tests.test_dashboard
 ```
 
 **Testes incluídos:**
 
-### test_integration.py (Mock Data)
+### src/tests/test_integration.py (Mock Data)
 - ✅ `test_mock_data_integrity()`: Valida estrutura e consistência de dados
 - ✅ `test_xlsx_generation_with_mock_data()`: Testa geração XLSX completa (4 abas)
 - ✅ `test_mock_data_summary()`: Imprime resumo de dados e consolidação
 - ✅ `get_markdown_tables_for_documentation()`: Gera tabelas para documentação
 
-### test_dashboard.py (Dashboard Tests)
+### src/tests/test_dashboard.py (Dashboard Tests)
 - ✅ `test_dashboard_generation` — HTML gerado com sucesso
 - ✅ `test_dashboard_data_embedding` — JSON embedded corretamente
 - ✅ `test_dashboard_tabs` — 4 abas presentes e funcionais
@@ -383,6 +448,39 @@ python3 test_dashboard.py
 - ✅ `test_dashboard_currency_formatting` — Formatação de moeda OK
 - ✅ `test_dashboard_all_institutions` — Todas as instituições aparecem
 - ✅ `test_dashboard_section_aggregation` — Seções agregadas corretamente
+
+## 📁 Estrutura de Diretórios
+
+```
+src/
+  main.py                 # Ponto de entrada principal
+  models.py               # Data classes
+  parser.py, extractor.py, normalizer.py, etc.
+  custodia_parser.py      # ✨ NOVO: Parser para XLSX de custódia
+  
+  tests/                  # ✨ REORGANIZADO
+    test_integration.py   # Testes com dados mockados
+    test_dashboard.py     # Testes do dashboard
+  
+  analysis/               # ✨ NOVO: Ferramentas de análise
+    analyze_clear_pdf.py  # Análise de PDF
+    analyze_mapping.py    # Mapeamento de campos
+  
+  examples/               # ✨ NOVO: Exemplos
+    examples_dashboard.py # Exemplos de uso
+  
+  generators/             # ✨ NOVO: Geradores
+    generate_dashboard_docs.py  # Documentação visual
+
+docs/
+  ARCHITECTURE.md         # Documentação técnica detalhada
+  CHANGELOG.md            # Histórico de mudanças
+  DASHBOARD.md            # Documentação do dashboard
+  ...
+
+output/                   # Saída (XLSX, HTML)
+input/                    # Entrada (ZIP com PDFs + XLSX opcional)
+
 
 **Resultado**: ✅ 20/20 testes passando
 
@@ -416,6 +514,22 @@ MIT License - Use livremente em seus projetos.
 Pedro Carlos Ferreira Santos  
 Desenvolvido com ❤️ para IRPF 2026
 
+## � Documentação Completa
+
+O projeto mantém documentação detalhada na pasta `/docs`:
+
+| Arquivo | Descrição |
+|---------|-----------|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Visão geral técnica, componentes e fluxos |
+| [docs/PARSER_FLOW_DIAGRAM.md](docs/PARSER_FLOW_DIAGRAM.md) | Diagramas e fluxos dos parsers |
+| [docs/PARSER_ANALYSIS.md](docs/PARSER_ANALYSIS.md) | Análise detalhada de cada parser |
+| [docs/DASHBOARD.md](docs/DASHBOARD.md) | Dashboard HTML: arquitetura e customização |
+| [docs/DASHBOARD_VISUAL.md](docs/DASHBOARD_VISUAL.md) | Exemplos visuais e tabelas do dashboard |
+| [docs/DASHBOARD_SESSION.md](docs/DASHBOARD_SESSION.md) | Gerenciamento de sessões no dashboard |
+| [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | Guia para contribuições e desenvolvimento |
+| [docs/SESSION_SUMMARY_TESTS_DOCS.md](docs/SESSION_SUMMARY_TESTS_DOCS.md) | Resumo de testes e documentação |
+| [docs/CHANGELOG.md](docs/CHANGELOG.md) | Histórico completo de versões e mudanças |
+
 ## 📅 Histórico de Versões
 
-Veja [CHANGELOG.md](CHANGELOG.md) para o histórico completo de mudanças.
+Veja [docs/CHANGELOG.md](docs/CHANGELOG.md) para o histórico completo de mudanças.

@@ -7,8 +7,8 @@ components and example screenshots showing the different tabs and features.
 
 from pathlib import Path
 from src.models import Entry
-from test_integration import MOCK_ENTRIES
-from test_dashboard import EXTENDED_TEST_DATA
+from src.tests.test_integration import MOCK_ENTRIES
+from src.tests.test_dashboard import EXTENDED_TEST_DATA
 
 
 def generate_dashboard_documentation():

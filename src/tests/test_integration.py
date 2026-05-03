@@ -279,6 +279,71 @@ MOCK_ENTRIES = [
         irrf=384.00,
         observacao='',
     ),
+    
+    # ─ Clear: Custódia de Ativos (Posição Consolidada)
+    Entry(
+        arquivo='Clear - 04 Custódia - Ano Base 2025 - IRPF2026.pdf',
+        instituicao='Clear',
+        cnpj_instituicao='',
+        ano_calendario=2025,
+        secao='Bens e Direitos',
+        grupo='04',
+        grupo_desc='Aplicações e Investimentos',
+        codigo='01',
+        codigo_desc='Ações',
+        fonte_pagadora='Clear',
+        cnpj_fonte='',
+        localizacao='105 - Brasil',
+        discriminacao='PSSA3 - Ativo em Custódia',
+        valor_2024=0.0,
+        valor_2025=19_344.00,
+        rendimento=0.0,
+        tipo_rendimento='',
+        irrf=0.0,
+        observacao='',
+    ),
+    Entry(
+        arquivo='Clear - 04 Custódia - Ano Base 2025 - IRPF2026.pdf',
+        instituicao='Clear',
+        cnpj_instituicao='',
+        ano_calendario=2025,
+        secao='Bens e Direitos',
+        grupo='07',
+        grupo_desc='Fundos de Investimento',
+        codigo='99',
+        codigo_desc='Fundos de Investimento',
+        fonte_pagadora='Clear',
+        cnpj_fonte='',
+        localizacao='105 - Brasil',
+        discriminacao='PLAG11 - Ativo em Custódia',
+        valor_2024=0.0,
+        valor_2025=9_785.00,
+        rendimento=0.0,
+        tipo_rendimento='',
+        irrf=0.0,
+        observacao='',
+    ),
+    Entry(
+        arquivo='Clear - 04 Custódia - Ano Base 2025 - IRPF2026.pdf',
+        instituicao='Clear',
+        cnpj_instituicao='',
+        ano_calendario=2025,
+        secao='Bens e Direitos',
+        grupo='06',
+        grupo_desc='Depósito à Vista e Numerário',
+        codigo='01',
+        codigo_desc='Depósito em conta corrente ou conta pagamento',
+        fonte_pagadora='Clear',
+        cnpj_fonte='',
+        localizacao='105 - Brasil',
+        discriminacao='Saldo disponível - Clear',
+        valor_2024=0.0,
+        valor_2025=7_745.95,
+        rendimento=0.0,
+        tipo_rendimento='',
+        irrf=0.0,
+        observacao='',
+    ),
 ]
 
 
@@ -305,7 +370,7 @@ def test_xlsx_generation_with_mock_data():
 
 def test_mock_data_integrity():
     """Verify mock data is valid."""
-    assert len(MOCK_ENTRIES) == 12, f"Expected 12 mock entries, got {len(MOCK_ENTRIES)}"
+    assert len(MOCK_ENTRIES) == 15, f"Expected 15 mock entries, got {len(MOCK_ENTRIES)}"
     
     for entry in MOCK_ENTRIES:
         assert entry.arquivo, "Arquivo não pode ser vazio"

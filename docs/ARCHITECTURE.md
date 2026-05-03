@@ -1,22 +1,59 @@
 # Arquitetura do Income Statement Processor
 
-## 📐 Visão Geral
+## � Estrutura de Pastas
+
+```
+src/
+  __init__.py
+  main.py                    # Orquestração principal
+  models.py                  # Data model (Entry)
+  extractor.py              # Extração de ZIP
+  parser.py                 # Parser de PDFs (6 instituições)
+  custodia_parser.py        # Parser de XLSX com dados de custódia
+  normalizer.py             # Normalização de valores
+  dashboard_generator.py    # Geração de dashboard HTML
+  sheets_writer.py          # Integração com Google Sheets
+  xlsx_writer.py            # Escrita de planilha XLSX
+  
+  tests/                    # Testes automatizados
+    __init__.py
+    test_integration.py     # Testes de integração com dados mockados
+    test_dashboard.py       # Testes do dashboard
+  
+  analysis/                 # Ferramentas de análise
+    __init__.py
+    analyze_clear_pdf.py    # Análise de PDF da Clear
+    analyze_mapping.py      # Mapeamento de campos
+  
+  examples/                 # Exemplos de uso
+    __init__.py
+    examples_dashboard.py   # Exemplos de geração de dashboard
+  
+  generators/               # Geradores de documentação
+    __init__.py
+    generate_dashboard_docs.py  # Documentação visual do dashboard
+```
+
+## 📐 Visão Geral do Pipeline
 
 O Income Statement Processor segue uma arquitetura **pipeline em cascata** com separação clara de responsabilidades:
 
 ```
 Input ZIP
-   ↓
+   ├── PDFs (Informes de Rendimentos)
+   └── XLSX (Dados de Custódia)
+      ↓
 [Extraction Layer] ← Descompactação + Detecção
-   ↓
-PDFs Individualizados
-   ↓
-[Parsing Layer] ← 6 Parsers especializados + Dispatcher
-   ↓
+      ↓
+   ├── PDFs Individualizados
+   └── XLSX Custódia
+      ↓
+[Parsing Layer] ← 6 Parsers PDFs + Parser XLSX
+      ↓
 Entradas Normalizadas (list[Entry])
-   ↓
-[Output Layer] ← XLSX + Google Sheets (opcional)
-   ↓
+      ↓
+[Output Layer] ← XLSX + Dashboard HTML + Google Sheets (opcional)
+      ↓
 Artefatos de Saída
 ```
 
@@ -37,6 +74,7 @@ Artefatos de Saída
 - `extract_zip(zip_path: str) -> dict[str, str]`
   - Descompacta ZIP tratando CP437 (XP Previdência)
   - Retorna `{filename: extracted_path}`
+  - **Novo**: Extrai também arquivos XLSX para custódia
 
 **Fluxo de Tratamento de Encoding:**
 
@@ -54,9 +92,11 @@ Escreve arquivo
 
 ---
 
-### 2. Camada de Parsing (`parser.py`)
+### 2. Camada de Parsing
 
-#### 2.1 Detector de Instituição
+#### 2.1 Parser de PDFs (`parser.py`)
+
+**Detector de Instituição:**
 
 ```python
 def detect_institution(filename: str, first_page: str) -> str
@@ -77,7 +117,118 @@ def detect_institution(filename: str, first_page: str) -> str
 | XP | `xp` + (não contém "previdência") |
 | XP Previdência | `xp` + `previdência` |
 
-#### 2.2 Dispatcher Principal
+**Dispatcher Principal:**
+
+```python
+def parse_file(filepath: str) -> list[Entry]
+```
+
+**Fluxo:**
+1. Abre PDF com pdfplumber
+2. Extrai `pages_text` (texto por página)
+3. Extrai `pages_tables` (tabelas estruturadas por página)
+4. Detecta instituição
+5. Chama parser específico
+6. Retorna `list[Entry]`
+
+#### 2.2 Parser de Custódia (`custodia_parser.py`)  ✨ NOVO
+
+**Responsabilidades:**
+- Ler arquivo XLSX com dados de custódia
+- Mapear tickers para grupo/código IRPF
+- Calcular custo de aquisição (quantidade × preço_médio)
+
+**Estrutura Esperada do XLSX:**
+
+| Coluna | Descrição | Tipo | Exemplo |
+|--------|-----------|------|---------|
+| A | Ativo (Ticker) | String | PSSA3, PLAG11 |
+| B | Quantidade de Cotas | Float | 100, 50.5 |
+| C | Preço Médio (BRL) | Float | 45.50, 120.00 |
+
+**Algoritmo:**
+
+```python
+def parse_custodia_xlsx(filepath: str, instituicao: str) -> list[Entry]
+```
+
+1. Abre workbook com openpyxl
+2. Localiza header row ("ativo", "quantidade", "preço")
+3. Para cada linha de dados:
+   - Extrai: ticker, quantidade, preço_médio
+   - Calcula: custo_aquisicao = quantidade × preço_médio
+   - Mapeia ticker → (grupo, codigo)
+   - Cria Entry com secao="Bens e Direitos"
+4. Retorna `list[Entry]`
+
+**Mapeamento de Ticker para Grupo/Código:**
+
+| Padrão | Grupo | Código | Descrição |
+|--------|-------|--------|-----------|
+| Termina em 11 | 07 | 02 | Fundos Imobiliários (FII) |
+| Termina em 3 ou 4 | 04 | 01 | Ações |
+| Termina em 34, 35 | 03 | 01 | BDRs (Ações exterior) |
+| Contains "ETF" | 07 | 03 | ETFs |
+| Default | 04 | 99 | Aplicações e Investimentos (outros) |
+
+**Exemplo de Processamento:**
+
+```
+Entrada:
+  Ativo: PSSA3
+  Quantidade: 400
+  Preço Médio: R$ 48,36
+
+Saída Entry:
+  secao: "Bens e Direitos"
+  grupo: "04"
+  codigo: "01"  (Ações)
+  discriminacao: "PSSA3 – Ativo em Custódia"
+  valor_2025: 19.344,00  (400 × 48,36)
+  observacao: "Custódia: 400.00 cotas × R$ 48,36"
+```
+
+#### 2.3 Parsers Especializados de PDFs
+
+Cada parser implementa interface comum:
+```python
+def parse_BANCO(filename: str, pages_text: list[str],
+                pages_tables: list[list]) -> list[Entry]
+```
+
+---
+
+### 3. Camada de Saída (`xlsx_writer.py`, `dashboard_generator.py`)
+
+**XLSX Generation:**
+- Aba 1: Dados Brutos (59 entradas, 19 colunas)
+- Aba 2: Resumo (Seção × Instituição)
+- Aba 3: Totais (Grupo × Código)
+- Aba 4: Para IRPF (Agrupado por instituição)
+
+**Dashboard HTML:**
+- 4 cards de métricas-chave
+- Gráfico Pizza (distribuição por instituição)
+- Gráfico Barras (evolução 2024 vs 2025)
+- 4 abas de dados com formatação responsiva
+
+---
+
+### 4. Módulos de Teste e Análise
+
+#### Tests (`src/tests/`)
+- `test_integration.py`: Dados mockados (12 entradas)
+- `test_dashboard.py`: Testes de geração HTML
+
+#### Analysis (`src/analysis/`)
+- `analyze_clear_pdf.py`: Inspção de PDF da Clear
+- `analyze_mapping.py`: Mapeamento de campos
+
+#### Examples (`src/examples/`)
+- `examples_dashboard.py`: 5 exemplos de uso
+
+#### Generators (`src/generators/`)
+- `generate_dashboard_docs.py`: Documentação visual
 
 ```python
 def parse_file(filepath: str) -> list[Entry]

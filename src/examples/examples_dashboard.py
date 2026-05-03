@@ -11,7 +11,7 @@ Demonstra diferentes formas de usar o dashboard generator:
 from pathlib import Path
 from src.dashboard_generator import generate_dashboard_html
 from src.models import Entry
-from test_integration import MOCK_ENTRIES
+from src.tests.test_integration import MOCK_ENTRIES
 
 
 def example_1_mock_data():

@@ -5,6 +5,191 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere a [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.2.0] - 2026-05-03
+
+### ✨ Adicionado
+
+#### ✨ Suporte para XLSX com Dados de Custódia (NOVO)
+- **Parser de Custódia XLSX**: Novo módulo `src/custodia_parser.py`
+  - Lê arquivo XLSX com colun as: Ativo, Quantidade de Cotas, Preço Médio
+  - Calcula automaticamente: `custo_aquisicao = quantidade × preço_médio`
+  - Mapeamento inteligente de ticker para grupo/código IRPF:
+    - FII (terminam em 11): Grupo 07, Código 02
+    - Ações (terminam em 3, 4): Grupo 04, Código 01
+    - BDRs (terminam em 34, 35): Grupo 03, Código 01
+    - ETFs: Grupo 07, Código 03
+  - Gera Entry com seção "Bens e Direitos" e localizacao "105 - Brasil"
+  - Suporta qualquer nome de arquivo `*custodia*.xlsx` (case-insensitive)
+  - Detecta broker automaticamente do nome do arquivo (Clear, XP, Avenue, etc.)
+
+- **Integração ao Pipeline**:
+  - `src/main.py` agora processa XLSX após PDFs
+  - Detecta automaticamente arquivo XLSX dentro do ZIP
+  - Saída unificada: Dados de Informes + Custódia na mesma planilha XLSX
+  - Dashboard inclui ativos de custódia nos gráficos
+
+- **Suporte no ZIP**:
+  - ZIP pode conter PDFs + arquivo XLSX simultaneamente
+  - Exemplo: `input/meu_arquivo.zip` contendo:
+    - `Accenture - Informe de Rendimentos...pdf`
+    - `Clear - 01 Informe de Rendimentos...pdf`
+    - `ClearCustodia_31dez2025.xlsx` ← processado automaticamente
+
+#### Reorganização da Estrutura de Diretórios
+- **Nova hierarquia em `src/`**:
+  ```
+  src/
+    tests/              # Testes automatizados
+      test_integration.py
+      test_dashboard.py
+    analysis/           # Ferramentas de análise
+      analyze_clear_pdf.py
+      analyze_mapping.py
+    examples/           # Exemplos de uso
+      examples_dashboard.py
+    generators/         # Geradores de documentação
+      generate_dashboard_docs.py
+    custodia_parser.py  # ✨ NOVO
+    main.py, models.py, parser.py, etc.
+  ```
+  
+- **Vantagens**:
+  - Organização mais clara por responsabilidade
+  - Separação entre código produção e ferramentas auxiliares
+  - Facilita futuros testes e manutenção
+  - Testes executáveis via `python3 -m src.tests.test_integration`
+
+- **Importações atualizadas**:
+  - `test_dashboard.py` agora importa de `src.tests.test_integration`
+  - `examples_dashboard.py` importa de `src.tests` e `src.examples`
+  - `generate_dashboard_docs.py` importa de `src.tests`
+  - Todos os imports relativos (`.` e `..`) funcionando corretamente
+
+### 📝 Documentação Atualizada
+
+#### ARCHITECTURE.md
+- Adicionada seção "Estrutura de Pastas" com nova hierarquia
+- Novo documento "Parser de Custódia (`custodia_parser.py`)"
+  - Responsabilidades
+  - Estrutura esperada do XLSX
+  - Algoritmo de processamento
+  - Mapeamento de ticker → grupo/código
+  - Exemplos de entrada/saída
+- Atualizado pipeline visual para incluir XLSX
+
+#### README.md
+- Adicionadas funcionalidades novas em destaque (✨ NOVO)
+- Nova seção "XLSX com Dados de Custódia"
+  - Instruções passo-a-passo
+  - Tabela de colunas obrigatórias
+  - Exemplo prático (arquivo `ClearCustodia.xlsx`)
+  - Nomes de arquivo suportados
+  - Resultado esperado no XLSX final
+- Exemplo de saída atualizado com processamento de custódia
+- Testes agora com comando `python3 -m src.tests.*`
+- Nova seção "Estrutura de Diretórios"
+
+#### Exemplos de Uso Atualizado
+- Saída esperada mostra processamento de XLSX:
+  ```
+  Processando custódia: ClearCustodia.xlsx
+    ✅ PSSA3: 400 cotas × R$ 48,36 = R$ 19.344,00
+    ✅ PLAG11: 81 cotas × R$ 120,80 = R$ 9.784,80
+    → 3 ativos em custódia extraídos.
+  ```
+
+### 🔧 Melhorado
+
+- **Validação de XLSX**: 
+  - Detecta header automaticamente (busca por "ativo")
+  - Trata dados faltantes com avisos informativos
+  - Valida quantidade e preço (deve ser > 0)
+
+- **Tratamento de Erros**:
+  - Erros em processamento de XLSX não interrompem pipeline
+  - Mensagens de aviso claras para linhas inválidas
+  - Logging de sucesso para cada ativo processado
+
+## [1.1.0] - 2026-05-03
+
+### ✨ Adicionado
+
+#### Suporte para Custódia de Ativos (Clear)
+- **Parser de Custódia da Clear**: Novo suporte para documento "Clear - 04 Custódia"
+  - Função `_parse_clear_custodia()` em `src/parser.py`
+  - Detecta automaticamente tipo de documento (Informe vs Custódia)
+  - Extrai ativos individuais (ações, FIIs, ETFs) com posições consolidadas
+  - Classificação automática de tipo de ativo por padrão de ticker:
+    - FII/ETF: Tickers terminando em 11, 13, 21, 24, 39, 65
+    - Ações: Demais padrões
+  - Inclui saldo em conta (cash disponível)
+  - Seção: "Bens e Direitos" com grupos apropriados (Grupo 04, 06, 07)
+
+- **Dados de Teste**: Adicionadas 3 entradas mockadas de custódia da Clear
+  - PSSA3 (Ação): R$ 19.344,00
+  - PLAG11 (FII): R$ 9.785,00
+  - Saldo disponível: R$ 7.745,95
+  - Mock data total agora: 15 entradas (antes: 12)
+
+#### Dark Mode no Dashboard
+- **Tema Escuro Completo**: Implementação de modo noturno
+  - CSS Variables (Custom Properties) para fácil tema switching
+  - Suporte automático para light/dark mode com toggle button
+  - Persistência de preferência do usuário via localStorage
+  - Cores otimizadas para redução de fadiga ocular:
+    - Light mode: Background #f8f9fa, Texto #333333
+    - Dark mode: Background #1a1a1a, Texto #e0e0e0
+  - Navbar com botão toggle (🌙 Dark Mode / ☀️ Light Mode)
+  - Transições suaves (300ms) entre temas
+  - Atualizações dinâmicas de gráficos ao trocar tema
+
+- **Persistência de Tema**: 
+  - localStorage key: `dashboard-theme` (valores: 'light' ou 'dark')
+  - Carregado automaticamente ao reabrir dashboard
+
+- **Gráficos Responsivos**:
+  - Chart.js com atualização de cores dinamicamente
+  - Cores de grade e texto adaptadas por tema
+  - Background de tooltip responsivo
+
+### 🔧 Melhorado
+
+- **Dashboard Generator**: Reescrito para suportar temas com CSS Variables
+  - Arquivo: `src/dashboard_generator.py` completamente refatorado
+  - Mantém compatibilidade com todas as abas e funcionalidades anteriores
+  - JavaScript melhorado para theme management
+
+- **Detecção de Documento Clear**:
+  - `parse_clear()` agora detecta tipo de documento ('custódia' no nome ou conteúdo)
+  - Mantém compatibilidade com "Informe de Rendimentos" (fallback para parse_xp)
+
+### 🧪 Testes
+
+- **Novo teste de Dark Mode**: `test_dashboard_dark_mode()`
+  - Valida presença de CSS variables
+  - Verifica toggle functionality
+  - Confirma localStorage persistence
+  - Testa inicialização de tema
+
+- **Mock data expandido**:
+  - test_integration.py: +3 entradas de custódia da Clear
+  - test_dashboard.py: Suporta novos dados de custódia
+
+### 📋 Documentação
+
+- README.md: Atualizado com informações sobre Dark Mode
+- ARCHITECTURE.md: Seção sobre processamento de custódia
+- Novos comentários em código (docstrings) para `_parse_clear_custodia()`
+
+### 📊 Dados
+
+- **Instituições suportadas**: 7 (sem mudança)
+- **Documentos por instituição (Clear)**: 
+  - ✅ 01 Informe de Rendimentos (rendimentos tributáveis/isentos)
+  - ✅ 04 Custódia (ativos em posição consolidada) - NOVO
+  - ℹ️ 02 Operações Normais (informativo, não estruturado)
+  - ℹ️ 03 Proventos (informativo, não estruturado)
+
 ## [1.0.2] - 2026-05-02
 
 ### ✨ Adicionado
