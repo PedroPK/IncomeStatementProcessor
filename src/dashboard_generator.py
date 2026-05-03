@@ -192,13 +192,54 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
         }}
         
         thead {{
-            background-color: var(--table-header-light);
+            background-color: var(--table-header-light) !important;
             font-weight: 600;
-            color: var(--text-light);
+            color: var(--text-light) !important;
+            border-color: var(--border-light) !important;
+        }}
+        
+        tbody tr {{
+            background-color: var(--bg-light-card) !important;
+            color: var(--text-light) !important;
+            border-color: var(--border-light) !important;
+        }}
+        
+        tbody tr:nth-child(even) {{
+            background-color: var(--bg-light-card) !important;
+        }}
+        
+        html.dark-mode tbody tr {{
+            background-color: #2d2d2d !important;
+        }}
+        
+        html.dark-mode tbody tr:nth-child(even) {{
+            background-color: #353535 !important;
         }}
         
         tbody tr:hover {{
             background-color: var(--border-light) !important;
+            cursor: pointer;
+        }}
+        
+        tbody td {{
+            border-color: var(--border-light) !important;
+            color: var(--text-light) !important;
+        }}
+        
+        table.table-striped tbody tr:nth-child(odd) td {{
+            background-color: var(--bg-light-card) !important;
+        }}
+        
+        table.table-striped tbody tr:nth-child(even) td {{
+            background-color: var(--bg-light-card) !important;
+        }}
+        
+        html.dark-mode table.table-striped tbody tr:nth-child(odd) td {{
+            background-color: #2d2d2d !important;
+        }}
+        
+        html.dark-mode table.table-striped tbody tr:nth-child(even) td {{
+            background-color: #353535 !important;
         }}
         
         .currency {{
@@ -407,8 +448,16 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
         const mockData = {json.dumps(data_json)};
 
         // Theme Management
+        window.appTheme = 'light'; // In-memory theme tracker for file:// URLs
+        
         function initializeTheme() {{
-            const savedTheme = localStorage.getItem('dashboard-theme') || 'light';
+            let savedTheme = 'light';
+            try {{
+                savedTheme = localStorage.getItem('dashboard-theme') || 'light';
+            }} catch(e) {{
+                console.log('localStorage not available, using in-memory theme');
+            }}
+            window.appTheme = savedTheme;
             if (savedTheme === 'dark') {{
                 document.documentElement.classList.add('dark-mode');
                 document.getElementById('theme-icon').textContent = '☀️ Light Mode';
@@ -421,12 +470,18 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
             
             if (isDark) {{
                 html.classList.remove('dark-mode');
-                localStorage.setItem('dashboard-theme', 'light');
+                window.appTheme = 'light';
+                try {{
+                    localStorage.setItem('dashboard-theme', 'light');
+                }} catch(e) {{}}
                 document.getElementById('theme-icon').textContent = '🌙 Dark Mode';
                 updateCharts('light');
             }} else {{
                 html.classList.add('dark-mode');
-                localStorage.setItem('dashboard-theme', 'dark');
+                window.appTheme = 'dark';
+                try {{
+                    localStorage.setItem('dashboard-theme', 'dark');
+                }} catch(e) {{}}
                 document.getElementById('theme-icon').textContent = '☀️ Light Mode';
                 updateCharts('dark');
             }}
