@@ -1,11 +1,15 @@
 """Orchestration: ZIP → parse → XLSX (+ optional Google Sheets)."""
 from __future__ import annotations
 
+import logging
 import os
 import sys
 import tempfile
 import shutil
 from pathlib import Path
+
+# Suppress noisy pdfminer font warnings
+logging.getLogger("pdfminer").setLevel(logging.ERROR)
 
 # ── Config loading (Python 3.11+ has tomllib built-in) ───────────────────────
 try:
