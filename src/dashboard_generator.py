@@ -6,8 +6,53 @@ from either real XLSX data or mock test data, with light/dark mode support.
 """
 
 import json
+import tomllib
 from pathlib import Path
 from src.models import Entry
+
+
+def load_dashboard_config() -> dict:
+    """Load dashboard configuration from config.toml."""
+    config_path = Path('config.toml')
+    if config_path.exists():
+        with open(config_path, 'rb') as f:
+            config = tomllib.load(f)
+            return config.get('dashboard', {})
+    return {}
+
+
+def truncate_label(label: str, config: dict) -> str:
+    """
+    Truncate label based on configuration.
+    
+    Args:
+        label: Original label text
+        config: Dashboard configuration dictionary
+        
+    Returns:
+        Truncated label
+    """
+    mode = config.get('label_truncation_mode', 'separator')
+    value = config.get('label_truncation_value', 'LTDA')
+    add_ellipsis = config.get('label_add_ellipsis', True)
+    
+    truncated = label
+    
+    if mode == 'max_length':
+        # Truncate by maximum length
+        max_len = int(value) if isinstance(value, (int, str)) else 30
+        if len(label) > max_len:
+            truncated = label[:max_len]
+    elif mode == 'separator':
+        # Truncate at separator
+        if value in label:
+            truncated = label[:label.index(value) + len(value)].strip()
+    
+    # Add ellipsis if truncated and configured
+    if add_ellipsis and truncated != label:
+        truncated += '...'
+    
+    return truncated
 
 
 def format_currency(value: float) -> str:
@@ -23,6 +68,9 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
         entries: List of Entry objects
         output_path: Path to write HTML dashboard
     """
+    
+    # Load dashboard configuration
+    dashboard_config = load_dashboard_config()
     
     # Prepare data for JSON embedding
     data_json = []
@@ -450,6 +498,34 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
     <script>
         // Data embedded in HTML
         const mockData = {json.dumps(data_json)};
+        const dashboardConfig = {json.dumps(dashboard_config)};
+
+        // Utility function to truncate labels based on configuration
+        function truncateLabel(label, config) {{
+            const mode = config.label_truncation_mode || 'separator';
+            const value = config.label_truncation_value || 'LTDA';
+            const addEllipsis = config.label_add_ellipsis !== false;
+            
+            let truncated = label;
+            
+            if (mode === 'max_length') {{
+                const maxLen = parseInt(value) || 30;
+                if (label.length > maxLen) {{
+                    truncated = label.substring(0, maxLen);
+                }}
+            }} else if (mode === 'separator') {{
+                const idx = label.indexOf(value);
+                if (idx !== -1) {{
+                    truncated = label.substring(0, idx + value.length).trim();
+                }}
+            }}
+            
+            if (addEllipsis && truncated !== label) {{
+                truncated += '...';
+            }}
+            
+            return truncated;
+        }}
 
         // Theme Management
         window.appTheme = 'light'; // In-memory theme tracker for file:// URLs
@@ -649,14 +725,23 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                 institutions[row.instituicao] += row.v2025;
             }});
 
+            // Truncate institution labels
+            const truncatedInstitutions = {{}};
+            const institutionLabels = [];
+            Object.keys(institutions).forEach(inst => {{
+                const truncated = truncateLabel(inst, dashboardConfig);
+                truncatedInstitutions[truncated] = institutions[inst];
+                institutionLabels.push(truncated);
+            }});
+
             // Chart 1: Institution Distribution
             const ctx1 = document.getElementById('chartInstitution').getContext('2d');
             chartInstance1 = new Chart(ctx1, {{
                 type: 'doughnut',
                 data: {{
-                    labels: Object.keys(institutions),
+                    labels: institutionLabels,
                     datasets: [{{
-                        data: Object.values(institutions),
+                        data: Object.values(truncatedInstitutions),
                         backgroundColor: [
                             '#667eea', '#764ba2', '#f093fb', '#4facfe',
                             '#43e97b', '#fa709a', '#30cfd0', '#a8edea'
@@ -694,19 +779,28 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                 evolution[row.instituicao].v2025 += row.v2025;
             }});
 
+            // Truncate evolution labels
+            const truncatedEvolution = {{}};
+            const evolutionLabels = [];
+            Object.keys(evolution).forEach(inst => {{
+                const truncated = truncateLabel(inst, dashboardConfig);
+                truncatedEvolution[truncated] = evolution[inst];
+                evolutionLabels.push(truncated);
+            }});
+
             chartInstance2 = new Chart(ctx2, {{
                 type: 'bar',
                 data: {{
-                    labels: Object.keys(evolution),
+                    labels: evolutionLabels,
                     datasets: [
                         {{
                             label: '2024',
-                            data: Object.values(evolution).map(e => e.v2024),
+                            data: Object.values(truncatedEvolution).map(e => e.v2024),
                             backgroundColor: '#667eea'
                         }},
                         {{
                             label: '2025',
-                            data: Object.values(evolution).map(e => e.v2025),
+                            data: Object.values(truncatedEvolution).map(e => e.v2025),
                             backgroundColor: '#764ba2'
                         }}
                     ]

@@ -3,7 +3,22 @@
 xlsx_path = "output/informes_rendimentos.xlsx"
 dashboard_path = "output/dashboard.html"
 
-# ── Google Sheets (optional) ─────────────────────────────────────────────────
+# ── Dashboard Configuration ─────────────────────────────────────────────────
+[dashboard]
+# Label truncation mode: "max_length" or "separator"
+# - "max_length": Truncates labels to a maximum character count
+# - "separator": Truncates labels at a specific separator string (e.g., "LTDA")
+label_truncation_mode = "separator"
+
+# Value for truncation based on mode:
+# - For "max_length": Maximum number of characters (e.g., 30)
+# - For "separator": Separator string to truncate at (e.g., "LTDA")
+label_truncation_value = "LTDA"
+
+# Add ellipsis (...) to truncated labels
+label_add_ellipsis = true
+
+# Google Sheets (optional) ─────────────────────────────────────────────────
 [google_sheets]
 enabled = false
 spreadsheet_name = "Informes de Rendimentos"
