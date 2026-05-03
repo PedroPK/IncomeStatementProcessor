@@ -1,12 +1,13 @@
 # Income Statement Processor (Processador de Informes de Rendimentos)
 
-Ferramenta Python para extrair, processar e consolidar Informes de Rendimentos (IRPF 2026) de 6 instituições financeiras brasileiras e internacionais, gerando um relatório Excel multitabs com classificação automática por grupo/código e categorização de rendimentos.
+Ferramenta Python para extrair, processar e consolidar Informes de Rendimentos (IRPF 2026) de 7 instituições financeiras brasileiras e internacionais, gerando um relatório Excel multitabs com classificação automática por grupo/código e categorização de rendimentos.
 
 ## 📋 Funcionalidades
 
-- **Extração de múltiplos formatos PDF**: Suporte nativo para 6 instituições:
+- **Extração de múltiplos formatos PDF**: Suporte nativo para 7 instituições:
   - Accenture (Comprovante de Rendimentos)
   - Avenue Securities (Ativos em custódia + depósitos)
+  - Clear (Fundos + renda fixa + Tesouro Direto)
   - Inter (Renda fixa + criptoativos)
   - NuBank (Renda fixa + fundos)
   - XP Investimentos (Fundos + renda fixa + Tesouro Direto)
@@ -58,6 +59,7 @@ pip install -r requirements.txt
   ```
   Accenture*.aspx
   Avenue*.pdf
+  Clear*.pdf
   Inter*.pdf
   NuBank*.pdf
   XP*.pdf          (main report)
@@ -153,7 +155,7 @@ output/informes_rendimentos.xlsx
 | `models.py` | Dataclass `Entry` — estrutura de dados |
 | `normalizer.py` | `parse_brl()`, `find_cnpj()`, `clean()` |
 | `extractor.py` | `extract_zip()`, `find_zip()` |
-| `parser.py` | 6 parsers por instituição + `detect_institution()` |
+| `parser.py` | 7 parsers por instituição + `detect_institution()` |
 | `xlsx_writer.py` | Geração de 4 abas XLSX com openpyxl |
 | `sheets_writer.py` | Exportação opcional para Google Sheets |
 | `main.py` | Orquestração principal |
@@ -170,6 +172,11 @@ output/informes_rendimentos.xlsx
 - **Extração**: Página 1 (saldo em conta) + Páginas 2-4 (tabelas de stocks/ETFs)
 - **Método**: `pdfplumber.extract_tables()` (não text regex)
 - **Saída**: Bens e Direitos por ativo individual
+
+#### Clear
+- **Entrada**: PDF com formato padrão Ministério da Economia (Informe de Rendimentos)
+- **Extração**: Reutiliza parser XP (mesmo formato de documento)
+- **Saída**: Rendimentos Tributação Exclusiva + Bens e Direitos (fundos, renda fixa, etc.)
 
 #### Inter
 - **Entrada**: PDF com seções denominadas

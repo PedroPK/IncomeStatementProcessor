@@ -5,6 +5,41 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere a [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.0.2] - 2026-05-02
+
+### ✨ Adicionado
+
+#### Suporte para Clear Corretora
+- **Parser da Clear**: Novo suporte para documentos "Informe de Rendimentos" da Clear
+  - Reutiliza lógica do parser XP (mesmo formato padrão Ministério da Economia)
+  - Função `parse_clear()` em `src/parser.py`
+  - Detecção automática na função `detect_institution()` (antes de XP para evitar confusão)
+  - Processa documentos: "Clear - 01 Informe de Rendimentos..."
+  
+- **Dados de Teste**: Adicionadas 2 entradas mockadas da Clear
+  - Fundos de Investimento Multimercado
+  - Rendimentos de Fundo
+  - Mock data total agora: 12 entradas (antes: 10)
+  - Testes de integração atualizados
+
+- **Documentação**: 
+  - README.md atualizado com Clear na lista de 7 instituições suportadas
+  - Padrão de nome: `Clear*.pdf`
+  - Descrição de parser: "Formato padrão Ministério da Economia (reutiliza XP)"
+
+### 🔧 Melhorado
+
+- **Detecção de Instituição**: Reordenada verificação para priorizar Clear antes de XP
+  - Evita falso positivo: documentos Clear contêm "XP Investimentos" nos dados internos
+  - Ordem: Accenture → Clear → NuBank → XP_Previdência → XP → Avenue → Inter
+
+### 📊 Dados Reais
+
+- **Total de instituições suportadas**: 7 (Accenture, Avenue, Clear, Inter, NuBank, XP, XP Vida)
+- **Dados processados na execução mais recente**: 60 entradas de 8 arquivos
+  - Clear contribui com 6 entradas extraídas (documento "01 Informe de Rendimentos")
+  - Documentos "02 Operações Normais" e "03 Proventos" são informativos (não estruturados para extração)
+
 ## [1.0.1] - 2026-05-02
 
 ### ✨ Adicionado
