@@ -181,8 +181,12 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
         
         .chart-container {{
             position: relative;
-            height: 300px;
+            height: 400px;
             margin: 20px 0;
+        }}
+        
+        #chartInstitution {{
+            min-height: 350px !important;
         }}
         
         table {{
@@ -661,10 +665,15 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                 }},
                 options: {{
                     responsive: true,
-                    maintainAspectRatio: true,
+                    maintainAspectRatio: false,
                     plugins: {{
                         legend: {{
-                            labels: {{ color: colors.text }}
+                            position: 'bottom',
+                            labels: {{ 
+                                color: colors.text,
+                                padding: 15,
+                                font: {{ size: 12 }}
+                            }}
                         }},
                         tooltip: {{
                             bodyColor: colors.text,
@@ -808,7 +817,7 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                                 instTotal.v2025 += r.v2025 || 0;
                                 instTotal.rendimento += r.rendimento || 0;
                                 instTotal.irrf += r.irrf || 0;
-                                const tickerMatch = r.discriminacao && r.discriminacao.match(/^([A-Z0-9]{{4,7}})\s*[\u2013-]/);
+                                const tickerMatch = r.discriminacao && r.discriminacao.match(/^([A-Z0-9]{{3,7}})\s*[\u2013-]/);
                                 const ticker = tickerMatch ? tickerMatch[1] : null;
                                 const descDisplay = ticker ? `<strong>${{ticker}}</strong> — ${{r.descricao}}` : r.descricao;
                                 return `
