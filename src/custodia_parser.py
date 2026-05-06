@@ -17,7 +17,7 @@ import openpyxl
 from src.models import Entry
 
 
-def parse_custodia_xlsx(filepath: str, instituicao: str = 'Custódia Personalizada') -> list[Entry]:
+def parse_custodia_xlsx(filepath: str, instituicao: str = 'Custódia Personalizada', reference_year: int = 2025) -> list[Entry]:
     """
     Parse custom custódia data from XLSX file.
     
@@ -25,6 +25,13 @@ def parse_custodia_xlsx(filepath: str, instituicao: str = 'Custódia Personaliza
     - Column A: Ativo (ticker, e.g., PSSA3, PLAG11)
     - Column B: Quantidade de Cotas (integer or float)
     - Column C: Preço Médio (float, in BRL)
+    
+    Args:
+        filepath: Path to the XLSX file
+        instituicao: Institution name (default: 'Custódia Personalizada')
+        reference_year: Reference year of the custody data (2024 or 2025).
+                        Determines whether custo_aquisicao goes into valor_2024
+                        or valor_2025 (default: 2025).
     
     Returns:
         List of Entry objects with calculated custo_aquisicao (quantidade × preço_médio)
@@ -100,12 +107,15 @@ def parse_custodia_xlsx(filepath: str, instituicao: str = 'Custódia Personaliza
         # Map ticker to grupo/código (will be improved with fuzzy matching)
         grupo, codigo, grupo_desc, codigo_desc = _map_ativo_to_grupo_codigo(ativo)
         
-        # Create Entry object
+        # Create Entry object – place cost in the correct year column
+        valor_2024 = custo_aquisicao if reference_year == 2024 else 0.0
+        valor_2025 = custo_aquisicao if reference_year == 2025 else 0.0
+
         entry = Entry(
             arquivo=Path(filepath).name,
             instituicao=instituicao,
             cnpj_instituicao='',
-            ano_calendario=2025,
+            ano_calendario=reference_year,
             secao='Bens e Direitos',
             grupo=grupo,
             grupo_desc=grupo_desc,
@@ -115,10 +125,9 @@ def parse_custodia_xlsx(filepath: str, instituicao: str = 'Custódia Personaliza
             cnpj_fonte='',
             localizacao='105 - Brasil',
             discriminacao=f'{ativo} – Ativo em Custódia',
-            valor_2024=0.0,
-            valor_2025=custo_aquisicao,  # Posição consolidada em 31/12/2025
-            rendimento=0.0,  # Será preenchido por outro informe se houver
-            tipo_rendimento='',
+            valor_2024=valor_2024,
+            valor_2025=valor_2025,
+            rendimento=0.0,  # Será preenchido por outro informe se houver            tipo_rendimento='',
             irrf=0.0,
             observacao=f'Custódia: {quantidade:.2f} cotas × R$ {preco_medio:.2f}',
         )

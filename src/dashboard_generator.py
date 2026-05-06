@@ -882,8 +882,29 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                 
                 // For each seção within this instituição
                 sortedSecoes.forEach(secao => {{
-                    const secaoRows = instData[secao];
-                    
+                    const rawRows = instData[secao];
+
+                    // Merge rows that share the same discriminacao (e.g. same asset
+                    // appearing in both the 2024 and 2025 custody files as separate entries)
+                    const mergedRows = [];
+                    const seenDisc = {{}};
+                    rawRows.forEach(r => {{
+                        if (r.discriminacao) {{
+                            if (seenDisc[r.discriminacao] !== undefined) {{
+                                mergedRows[seenDisc[r.discriminacao]].v2024      += r.v2024      || 0;
+                                mergedRows[seenDisc[r.discriminacao]].v2025      += r.v2025      || 0;
+                                mergedRows[seenDisc[r.discriminacao]].rendimento += r.rendimento || 0;
+                                mergedRows[seenDisc[r.discriminacao]].irrf       += r.irrf       || 0;
+                            }} else {{
+                                seenDisc[r.discriminacao] = mergedRows.length;
+                                mergedRows.push(Object.assign({{}}, r));
+                            }}
+                        }} else {{
+                            mergedRows.push(r);
+                        }}
+                    }});
+                    const secaoRows = mergedRows;
+
                     // Section subheader
                     const secaoDiv = document.createElement('div');
                     secaoDiv.style.marginTop = '10px';

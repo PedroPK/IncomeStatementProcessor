@@ -77,6 +77,24 @@ def _extract_broker_name(filename: str) -> str:
     return name.replace('custodia', '').replace('_', ' ').strip().title() or 'Custódia Personalizada'
 
 
+def _detect_custody_year(filename: str) -> int:
+    """Detect the custody reference year from the XLSX filename.
+
+    Looks for patterns like "31 Dezembro 2024" or "Dezembro 2025" or
+    "Custódia YYYY" in the filename.  Falls back to 2025 if nothing is found.
+    """
+    import re
+    # Match "Dezembro YYYY" or "dezembro YYYY" (with optional "31 " before it)
+    m = re.search(r'dezembro\s+(\d{4})', filename, re.IGNORECASE)
+    if m:
+        return int(m.group(1))
+    # Fallback: last 4-digit year found before ".xlsx"
+    years = re.findall(r'\b(20\d{2})\b', filename)
+    if years:
+        return int(years[-1])
+    return 2025
+
+
 def main() -> None:
     # ── Load config ───────────────────────────────────────────────────────────
     cfg_path = sys.argv[1] if len(sys.argv) > 1 else 'config.toml'
@@ -129,11 +147,13 @@ def main() -> None:
     xlsx_files = [f for f in file_map.keys() if f.lower().endswith(('.xlsx', '.xls'))]
     if xlsx_files:
         for xlsx_filename in xlsx_files:
-            print(f'  Processando custódia: {xlsx_filename}')
+            ref_year = _detect_custody_year(xlsx_filename)
+            print(f'  Processando custódia: {xlsx_filename} (ano de referência: {ref_year})')
             try:
                 xlsx_entries = parse_custodia_xlsx(
                     file_map[xlsx_filename],
-                    instituicao=_extract_broker_name(xlsx_filename)
+                    instituicao=_extract_broker_name(xlsx_filename),
+                    reference_year=ref_year,
                 )
                 if xlsx_entries:
                     print(f'    → {len(xlsx_entries)} ativos em custódia extraídos.')
