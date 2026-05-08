@@ -5,6 +5,14 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere a [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.2.1] - 2026-05-07
+
+### 🐛 Corrigido
+
+- **Aba Para IRPF – duplicatas por instituição**: linhas com a mesma trinca (Grupo, Código, Descrição) mas `discriminacao` distinta (ex.: múltiplos CDBs/fundos individuais da XP) não eram consolidadas, gerando linhas duplicadas para Nubank, Inter e XP.
+  - A lógica de mesclagem no dashboard passou a agregar **sempre** por `(grupo, codigo, descricao)`, independentemente de `discriminacao`.
+  - Cada trinca é agora exibida como uma única linha com os valores somados, conforme exigido pelo formulário DIRPF.
+
 ## [1.2.0] - 2026-05-03
 
 ### ✨ Adicionado

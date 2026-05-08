@@ -80,7 +80,8 @@ Quatro abas interativas com dados sincronizados com XLSX:
 #### Aba 4: Para IRPF
 - **Organização**: Agrupado por Instituição (alfabético)
 - **Estrutura**: Cada instituição em seção própria
-  - Subtabelas com todas as entradas
+  - Subtabelas agregadas por `(Grupo, Código, Descrição)` — independente de `discriminacao` individual
+  - Linhas com mesma trinca (ex.: múltiplos CDBs do mesmo código) são somadas em uma única linha
   - Subtotal por instituição em fundo cinza
 - **Total Geral**: Resumo consolidado de todas as instituições
 
