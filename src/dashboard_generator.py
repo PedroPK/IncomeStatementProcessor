@@ -903,33 +903,20 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                 sortedSecoes.forEach(secao => {{
                     const rawRows = instData[secao];
 
-                    // Merge rows sharing the same discriminacao, or — when no
-                    // discriminacao is present — sharing the same (grupo, codigo, descricao).
+                    // For IRPF purposes always aggregate by (grupo, codigo, descricao).
+                    // Individual discriminacao values are irrelevant at declaration level.
                     const mergedRows = [];
-                    const seenDisc = {{}};
-                    const seenKey  = {{}};
+                    const seenKey   = {{}};
                     rawRows.forEach(r => {{
-                        if (r.discriminacao) {{
-                            if (seenDisc[r.discriminacao] !== undefined) {{
-                                mergedRows[seenDisc[r.discriminacao]].v2024      += r.v2024      || 0;
-                                mergedRows[seenDisc[r.discriminacao]].v2025      += r.v2025      || 0;
-                                mergedRows[seenDisc[r.discriminacao]].rendimento += r.rendimento || 0;
-                                mergedRows[seenDisc[r.discriminacao]].irrf       += r.irrf       || 0;
-                            }} else {{
-                                seenDisc[r.discriminacao] = mergedRows.length;
-                                mergedRows.push(Object.assign({{}}, r));
-                            }}
+                        const key = `${{r.grupo || ''}}|${{r.codigo}}|${{r.descricao}}`;
+                        if (seenKey[key] !== undefined) {{
+                            mergedRows[seenKey[key]].v2024      += r.v2024      || 0;
+                            mergedRows[seenKey[key]].v2025      += r.v2025      || 0;
+                            mergedRows[seenKey[key]].rendimento += r.rendimento || 0;
+                            mergedRows[seenKey[key]].irrf       += r.irrf       || 0;
                         }} else {{
-                            const key = `${{r.grupo || ''}}|${{r.codigo}}|${{r.descricao}}`;
-                            if (seenKey[key] !== undefined) {{
-                                mergedRows[seenKey[key]].v2024      += r.v2024      || 0;
-                                mergedRows[seenKey[key]].v2025      += r.v2025      || 0;
-                                mergedRows[seenKey[key]].rendimento += r.rendimento || 0;
-                                mergedRows[seenKey[key]].irrf       += r.irrf       || 0;
-                            }} else {{
-                                seenKey[key] = mergedRows.length;
-                                mergedRows.push(Object.assign({{}}, r));
-                            }}
+                            seenKey[key] = mergedRows.length;
+                            mergedRows.push(Object.assign({{}}, r));
                         }}
                     }});
                     const secaoRows = mergedRows;
