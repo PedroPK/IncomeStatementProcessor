@@ -344,32 +344,24 @@ def _write_para_irpf(wb: Workbook, df: pd.DataFrame) -> None:
         for secao in sorted(inst_df['Seção'].unique()):
             sec_df = inst_df[inst_df['Seção'] == secao]
 
-            # Merge rows that share the same Discriminação (e.g. custody assets
-            # that appear in both the 2024 and 2025 files as separate entries).
-            # Rows without a Discriminação are kept as-is.
+            # Aggregate rows that share (Grupo, Código, Código Descrição).
             merged_rows: list[dict] = []
-            seen_disc: dict[str, dict] = {}
+            seen_key: dict[tuple, dict] = {}
             for _, r in sec_df.iterrows():
-                disc = r.get('Discriminação')
-                if disc and pd.notna(disc):
-                    disc_str = str(disc)
-                    if disc_str in seen_disc:
-                        seen_disc[disc_str]['Valor 31/12/2024'] += r['Valor 31/12/2024']
-                        seen_disc[disc_str]['Valor 31/12/2025'] += r['Valor 31/12/2025']
-                        seen_disc[disc_str]['Rendimento'] += r['Rendimento']
-                        seen_disc[disc_str]['IRRF'] += r['IRRF']
-                    else:
-                        row_dict = r.to_dict()
-                        seen_disc[disc_str] = row_dict
-                        merged_rows.append(row_dict)
+                key = (r['Grupo'], r['Código'], r['Código Descrição'])
+                if key in seen_key:
+                    seen_key[key]['Valor 31/12/2024'] += r['Valor 31/12/2024']
+                    seen_key[key]['Valor 31/12/2025'] += r['Valor 31/12/2025']
+                    seen_key[key]['Rendimento'] += r['Rendimento']
+                    seen_key[key]['IRRF'] += r['IRRF']
                 else:
-                    merged_rows.append(r.to_dict())
+                    row_dict = r.to_dict()
+                    seen_key[key] = row_dict
+                    merged_rows.append(row_dict)
 
             for ri, r in enumerate(merged_rows):
                 fill = _ALT_FILL if ri % 2 == 1 else None
-                # Prefer Discriminação as description when available (e.g. custody tickers)
-                disc = r.get('Discriminação')
-                desc = disc if disc and pd.notna(disc) else r['Código Descrição']
+                desc = r['Código Descrição']
                 vals = [
                     r['Seção'], r['Grupo'], r['Código'], desc,
                     r['Valor 31/12/2024'], r['Valor 31/12/2025'],

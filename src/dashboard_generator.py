@@ -7,6 +7,7 @@ from either real XLSX data or mock test data, with light/dark mode support.
 
 import json
 import tomllib
+from datetime import datetime
 from pathlib import Path
 from src.models import Entry
 
@@ -89,6 +90,9 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
             'irrf': entry.irrf
         })
     
+    # Generate timestamp
+    generated_at = datetime.now().strftime('%d/%m/%Y às %H:%M')
+
     # Calculate metrics
     total_2024 = sum(e.valor_2024 for e in entries)
     total_2025 = sum(e.valor_2025 for e in entries)
@@ -139,7 +143,8 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
         }}
         
         .navbar {{
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            background-color: #667eea !important;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }}
         
@@ -316,14 +321,24 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
         }}
         
         .navbar-brand {{
-            color: white;
+            color: white !important;
             font-weight: bold;
             margin: 0;
         }}
         
         .navbar-text {{
-            color: rgba(255,255,255,0.7);
+            color: rgba(255,255,255,0.8) !important;
             margin: 0;
+        }}
+        
+        .generated-at {{
+            font-size: 0.82rem;
+            text-align: right;
+            color: #666666;
+        }}
+        
+        html.dark-mode .generated-at {{
+            color: #aaaaaa;
         }}
         
         .container-fluid {{
@@ -339,19 +354,23 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
 </head>
 <body>
     <!-- Navigation -->
-    <nav class="navbar navbar-dark mb-4">
-        <div class="navbar-content container-fluid">
-            <div class="navbar-title">
-                <span class="navbar-brand mb-0 h1">📊 Income Statement Processor</span>
-                <span class="navbar-text">Dashboard - IRPF 2026</span>
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); box-shadow: 0 2px 10px rgba(0,0,0,0.2); padding: 12px 0 6px 0; margin-bottom: 1.5rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding: 0 20px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span style="color:#ffffff; font-weight:bold; font-size:1.5rem;">📊 Income Statement Processor</span>
+                <span style="color:rgba(255,255,255,0.85); font-size:1rem;">Dashboard - IRPF 2026</span>
             </div>
             <button class="theme-toggle" onclick="toggleTheme()">
                 <span id="theme-icon">🌙 Dark Mode</span>
             </button>
         </div>
-    </nav>
+        <div style="text-align:right; padding: 4px 20px 0 20px;">
+            <span style="font-size:0.78rem; color:rgba(255,255,255,0.75);">Gerado em {generated_at}</span>
+        </div>
+    </div>
 
-    <div class="container-fluid">
+    <div class="container-fluid mt-2">
+
         <!-- Key Metrics -->
         <div class="row mb-4">
             <div class="col-md-3">
