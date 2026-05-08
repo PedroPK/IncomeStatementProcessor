@@ -903,10 +903,11 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                 sortedSecoes.forEach(secao => {{
                     const rawRows = instData[secao];
 
-                    // Merge rows that share the same discriminacao (e.g. same asset
-                    // appearing in both the 2024 and 2025 custody files as separate entries)
+                    // Merge rows sharing the same discriminacao, or — when no
+                    // discriminacao is present — sharing the same (grupo, codigo, descricao).
                     const mergedRows = [];
                     const seenDisc = {{}};
+                    const seenKey  = {{}};
                     rawRows.forEach(r => {{
                         if (r.discriminacao) {{
                             if (seenDisc[r.discriminacao] !== undefined) {{
@@ -919,7 +920,16 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                                 mergedRows.push(Object.assign({{}}, r));
                             }}
                         }} else {{
-                            mergedRows.push(r);
+                            const key = `${{r.grupo || ''}}|${{r.codigo}}|${{r.descricao}}`;
+                            if (seenKey[key] !== undefined) {{
+                                mergedRows[seenKey[key]].v2024      += r.v2024      || 0;
+                                mergedRows[seenKey[key]].v2025      += r.v2025      || 0;
+                                mergedRows[seenKey[key]].rendimento += r.rendimento || 0;
+                                mergedRows[seenKey[key]].irrf       += r.irrf       || 0;
+                            }} else {{
+                                seenKey[key] = mergedRows.length;
+                                mergedRows.push(Object.assign({{}}, r));
+                            }}
                         }}
                     }});
                     const secaoRows = mergedRows;
