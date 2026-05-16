@@ -1,11 +1,12 @@
 .venv/
+.DS_Store
 __pycache__/
 *.pyc
 *.pyo
-input/
-output/
-examples/*.html
 credentials/credentials.json
 credentials/token.json
+examples/*.html
+input/
+output/
+temp/
 /tmp/
-.DS_Store
