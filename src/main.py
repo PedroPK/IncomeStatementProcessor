@@ -16,6 +16,7 @@ import threading
 import time
 import uuid
 import webbrowser
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as _FuturesTimeoutError
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
@@ -321,6 +322,7 @@ def _collect_upload_file_map(uploaded_paths: list[Path]) -> tuple[dict[str, str]
 def _parse_file_map(
     file_map: dict[str, str],
     progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    stall_timeout: int = 60,
 ) -> tuple[list, list[str], int, int]:
     """Parse PDFs/XLSX from an extracted file map and return entries/errors."""
     all_entries = []
@@ -356,7 +358,16 @@ def _parse_file_map(
         print(f'  Processando: {filename}')
         notify('Processando arquivo PDF', filename)
         try:
-            entries = parse_file(filepath)
+            with ThreadPoolExecutor(max_workers=1) as _ex:
+                _fut = _ex.submit(parse_file, filepath)
+                try:
+                    entries = _fut.result(timeout=stall_timeout)
+                except _FuturesTimeoutError:
+                    print(f'    [timeout] {filename} sem progresso por {stall_timeout}s — ignorado.')
+                    errors.append(filename)
+                    processed += 1
+                    notify('Arquivo PDF ignorado por timeout', filename)
+                    continue
         except Exception as exc:  # noqa: BLE001
             print(f'    [erro] Erro ao processar {filename}: {exc}')
             errors.append(filename)
@@ -456,7 +467,10 @@ def _run_pipeline(
             'total_steps': total_steps,
         })
 
-    all_entries, errors, parse_processed, parse_total = _parse_file_map(file_map, parse_notify)
+    all_entries, errors, parse_processed, parse_total = _parse_file_map(
+        file_map, parse_notify,
+        stall_timeout=config.get('processing', {}).get('stall_timeout_seconds', 60),
+    )
     steps_done = min(parse_processed, parse_total)
 
     print(f'\nTotal: {len(all_entries)} entradas processadas.')

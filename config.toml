@@ -1,3 +1,10 @@
+# ── Processing ──────────────────────────────────────────────────────────────
+[processing]
+# Maximum seconds to wait for a single file to be parsed with no progress.
+# If this limit is exceeded (e.g. network hang), the file is skipped and
+# processing continues with the remaining files.
+stall_timeout_seconds = 60
+
 # ── Output ──────────────────────────────────────────────────────────────────
 [output]
 xlsx_path = "output/informes_rendimentos.xlsx"
