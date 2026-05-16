@@ -93,6 +93,15 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
     # Generate timestamp
     generated_at = datetime.now().strftime('%d/%m/%Y às %H:%M')
 
+    # Extract taxpayer information (should be the same for all entries)
+    nome_contribuinte = ""
+    cpf_contribuinte = ""
+    for entry in entries:
+        if entry.nome_contribuinte or entry.cpf_contribuinte:
+            nome_contribuinte = entry.nome_contribuinte or ""
+            cpf_contribuinte = entry.cpf_contribuinte or ""
+            break
+
     # Calculate metrics
     total_2024 = sum(e.valor_2024 for e in entries)
     total_2025 = sum(e.valor_2025 for e in entries)
@@ -370,6 +379,40 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
     </div>
 
     <div class="container-fluid mt-2">
+
+        <!-- Taxpayer Information Card -->
+        {f'''
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card p-3" style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%); border-left: 4px solid #667eea;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <h5 style="margin: 0; color: var(--primary-color); font-weight: 600;">
+                                👤 Contribuinte
+                            </h5>
+                            <div style="margin-top: 12px; display: flex; gap: 30px;">
+                                <div>
+                                    <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase;">Nome</p>
+                                    <p style="margin: 5px 0 0 0; font-size: 1rem; font-weight: 500; color: var(--text-light);">
+                                        {nome_contribuinte or "Não informado"}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase;">CPF</p>
+                                    <p style="margin: 5px 0 0 0; font-size: 1rem; font-weight: 500; color: var(--text-light); font-family: 'Courier New', monospace;">
+                                        {cpf_contribuinte or "Não informado"}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="text-align: right; padding-right: 10px;">
+                            <div style="font-size: 3rem; opacity: 0.3;">📋</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        ''' if nome_contribuinte or cpf_contribuinte else ''}
 
         <!-- Key Metrics -->
         <div class="row mb-4">

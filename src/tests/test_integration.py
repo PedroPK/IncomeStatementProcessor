@@ -15,6 +15,10 @@ from src.xlsx_writer import write_xlsx
 # MOCK DATA - Dados simulados para testes sem exposição de informações pessoais
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Mock taxpayer information (fictitious for testing purposes)
+MOCK_TAXPAYER_NAME = 'João Silva Santos'
+MOCK_TAXPAYER_CPF = '123.456.789-10'
+
 MOCK_ENTRIES = [
     # ─ Itaú: Renda Fixa
     Entry(
@@ -36,6 +40,8 @@ MOCK_ENTRIES = [
         rendimento=0.0,
         tipo_rendimento='',
         irrf=0.0,
+        nome_contribuinte=MOCK_TAXPAYER_NAME,
+        cpf_contribuinte=MOCK_TAXPAYER_CPF,
         observacao='',
     ),
     Entry(
@@ -57,6 +63,8 @@ MOCK_ENTRIES = [
         rendimento=2_500.00,
         tipo_rendimento='Tributação Exclusiva',
         irrf=750.00,
+        nome_contribuinte=MOCK_TAXPAYER_NAME,
+        cpf_contribuinte=MOCK_TAXPAYER_CPF,
         observacao='',
     ),
     
@@ -80,6 +88,8 @@ MOCK_ENTRIES = [
         rendimento=0.0,
         tipo_rendimento='',
         irrf=0.0,
+        nome_contribuinte=MOCK_TAXPAYER_NAME,
+        cpf_contribuinte=MOCK_TAXPAYER_CPF,
         observacao='',
     ),
     Entry(
@@ -101,6 +111,8 @@ MOCK_ENTRIES = [
         rendimento=8_750.00,
         tipo_rendimento='Tributação Exclusiva',
         irrf=2_625.00,
+        nome_contribuinte=MOCK_TAXPAYER_NAME,
+        cpf_contribuinte=MOCK_TAXPAYER_CPF,
         observacao='',
     ),
     
@@ -124,6 +136,8 @@ MOCK_ENTRIES = [
         rendimento=0.0,
         tipo_rendimento='',
         irrf=0.0,
+        nome_contribuinte=MOCK_TAXPAYER_NAME,
+        cpf_contribuinte=MOCK_TAXPAYER_CPF,
         observacao='',
     ),
     Entry(
@@ -145,6 +159,8 @@ MOCK_ENTRIES = [
         rendimento=125.50,
         tipo_rendimento='Tributação Exclusiva',
         irrf=37.65,
+        nome_contribuinte=MOCK_TAXPAYER_NAME,
+        cpf_contribuinte=MOCK_TAXPAYER_CPF,
         observacao='',
     ),
     
@@ -168,6 +184,8 @@ MOCK_ENTRIES = [
         rendimento=0.0,
         tipo_rendimento='',
         irrf=0.0,
+        nome_contribuinte=MOCK_TAXPAYER_NAME,
+        cpf_contribuinte=MOCK_TAXPAYER_CPF,
         observacao='',
     ),
     Entry(
@@ -189,6 +207,8 @@ MOCK_ENTRIES = [
         rendimento=0.0,
         tipo_rendimento='',
         irrf=0.0,
+        nome_contribuinte=MOCK_TAXPAYER_NAME,
+        cpf_contribuinte=MOCK_TAXPAYER_CPF,
         observacao='Isenta',
     ),
     
@@ -212,6 +232,8 @@ MOCK_ENTRIES = [
         rendimento=0.0,
         tipo_rendimento='',
         irrf=0.0,
+        nome_contribuinte=MOCK_TAXPAYER_NAME,
+        cpf_contribuinte=MOCK_TAXPAYER_CPF,
         observacao='',
     ),
     Entry(
@@ -233,6 +255,8 @@ MOCK_ENTRIES = [
         rendimento=1_280.00,
         tipo_rendimento='Tributação Exclusiva',
         irrf=384.00,
+        nome_contribuinte=MOCK_TAXPAYER_NAME,
+        cpf_contribuinte=MOCK_TAXPAYER_CPF,
         observacao='',
     ),
     
@@ -256,6 +280,8 @@ MOCK_ENTRIES = [
         rendimento=0.0,
         tipo_rendimento='',
         irrf=0.0,
+        nome_contribuinte=MOCK_TAXPAYER_NAME,
+        cpf_contribuinte=MOCK_TAXPAYER_CPF,
         observacao='',
     ),
     Entry(
@@ -277,6 +303,8 @@ MOCK_ENTRIES = [
         rendimento=0.0,
         tipo_rendimento='',
         irrf=0.0,
+        nome_contribuinte=MOCK_TAXPAYER_NAME,
+        cpf_contribuinte=MOCK_TAXPAYER_CPF,
         observacao='',
     ),
     Entry(
@@ -298,6 +326,8 @@ MOCK_ENTRIES = [
         rendimento=0.0,
         tipo_rendimento='',
         irrf=0.0,
+        nome_contribuinte=MOCK_TAXPAYER_NAME,
+        cpf_contribuinte=MOCK_TAXPAYER_CPF,
         observacao='',
     ),
 ]

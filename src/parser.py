@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from src.models import Entry
-from src.normalizer import parse_brl, find_cnpj, clean, extract_year
+from src.normalizer import parse_brl, find_cnpj, extract_taxpayer_info, clean, extract_year
 
 
 # ── Institution detection ─────────────────────────────────────────────────────
@@ -41,6 +41,10 @@ def detect_institution(filename: str, first_page: str) -> str:
         return 'avenue'
     if 'inter' in fname:
         return 'inter'
+    if 'fachesf' in fname or 'chesf' in fname or 'fundacao chesf' in text:
+        return 'fachesf'
+    if 'inss' in fname or 'regime geral de previdencia' in text or 'frgps' in text:
+        return 'inss'
     return 'unknown'
 
 
@@ -48,7 +52,9 @@ def detect_institution(filename: str, first_page: str) -> str:
 
 def _entry(filename: str, instituicao: str, cnpj_inst: str, ano: int,
            secao: str, grupo: str, grupo_desc: str,
-           codigo: str, codigo_desc: str, **kwargs) -> Entry:
+           codigo: str, codigo_desc: str, 
+           nome_contribuinte: str = "", cpf_contribuinte: str = "",
+           **kwargs) -> Entry:
     return Entry(
         arquivo=filename,
         instituicao=instituicao,
@@ -59,6 +65,8 @@ def _entry(filename: str, instituicao: str, cnpj_inst: str, ano: int,
         grupo_desc=grupo_desc,
         codigo=codigo.zfill(2) if codigo.isdigit() else codigo,
         codigo_desc=codigo_desc,
+        nome_contribuinte=nome_contribuinte,
+        cpf_contribuinte=cpf_contribuinte,
         **kwargs,
     )
 
@@ -73,6 +81,11 @@ def parse_file(filepath: str) -> list[Entry]:
         pages_text = [p.extract_text() or '' for p in pdf.pages]
         pages_tables = [p.extract_tables() or [] for p in pdf.pages]
 
+    full_text = '\n'.join(pages_text)
+    
+    # Extract taxpayer information once from the document
+    nome_contribuinte, cpf_contribuinte = extract_taxpayer_info(full_text)
+
     institution = detect_institution(filename, pages_text[0] if pages_text else '')
 
     parsers = {
@@ -83,6 +96,8 @@ def parse_file(filepath: str) -> list[Entry]:
         'avenue': parse_avenue,
         'inter': parse_inter,
         'clear': parse_clear,
+        'fachesf': parse_fachesf,
+        'inss': parse_inss,
     }
 
     parser_fn = parsers.get(institution)
@@ -92,17 +107,26 @@ def parse_file(filepath: str) -> list[Entry]:
             cnpj_instituicao='', ano_calendario=0,
             secao='Desconhecido', grupo='', grupo_desc='',
             codigo='', codigo_desc='',
+            nome_contribuinte=nome_contribuinte,
+            cpf_contribuinte=cpf_contribuinte,
             observacao='Formato não reconhecido',
         )]
 
     try:
-        return parser_fn(filename, pages_text, pages_tables)
+        entries = parser_fn(filename, pages_text, pages_tables)
+        # Add taxpayer information to all entries from this document
+        for entry in entries:
+            entry.nome_contribuinte = nome_contribuinte
+            entry.cpf_contribuinte = cpf_contribuinte
+        return entries
     except Exception as exc:  # noqa: BLE001
         return [Entry(
             arquivo=filename, instituicao=institution,
             cnpj_instituicao='', ano_calendario=0,
             secao='Erro', grupo='', grupo_desc='',
             codigo='', codigo_desc='',
+            nome_contribuinte=nome_contribuinte,
+            cpf_contribuinte=cpf_contribuinte,
             observacao=f'Erro ao processar: {exc}',
         )]
 
@@ -1005,6 +1029,165 @@ def parse_avenue(filename: str, pages_text: list[str],
     # Flush last pending asset
     if pending is not None:
         flush(0.0, 0.0, 0.0)
+
+    return entries
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FACHESF  (Fundação CHESF de Assistência e Seguridade Social)
+# Format: Comprovante de Rendimentos Pagos – numbered fields, single page
+# ─────────────────────────────────────────────────────────────────────────────
+
+def parse_fachesf(filename: str, pages_text: list[str],
+                  pages_tables: list[list]) -> list[Entry]:
+    text = '\n'.join(pages_text)
+    entries: list[Entry] = []
+
+    # Institution / CNPJ
+    cnpj_m = re.search(r'(\d{2}[\.\s]?\d{3}[\.\s]?\d{3}[\.\s]?\d{4}[\-\s]?\d{2})', text)
+    if cnpj_m:
+        raw = re.sub(r'\D', '', cnpj_m.group(1))
+        cnpj = f'{raw[:2]}.{raw[2:5]}.{raw[5:8]}/{raw[8:12]}-{raw[12:]}' if len(raw) == 14 else cnpj_m.group(1)
+    else:
+        cnpj = '42.160.192/0001-43'
+    inst = 'FACHESF – Fundação CHESF de Assistência e Seguridade Social'
+    ano = extract_year(text)
+
+    def _v(pattern: str) -> float:
+        m = re.search(pattern + r'[^\n]*([\d.]+,\d{2})', text, re.IGNORECASE | re.DOTALL)
+        return parse_brl(m.group(1)) if m else 0.0
+
+    def add(secao, grupo, gdesc, codigo, cdesc, **kw):
+        entries.append(_entry(filename, inst, cnpj, ano,
+                               secao, grupo, gdesc, codigo, cdesc,
+                               fonte_pagadora=inst, cnpj_fonte=cnpj, **kw))
+
+    # ── Quadro 3: Rendimentos Tributáveis ─────────────────────────────────
+    total_rend = _v(r'01\.\s*TOTAL\s*DOS\s*RENDIMENTOS')
+    prev_priv  = _v(r'03\.\s*CONTRIBUI[CÇ][AÃ]O\s*[AÀ]?\s*PREVID[EÊ]NCIA\s*PRIVADA')
+    irrf       = _v(r'05\.\s*IMPOSTO\s*DE\s*RENDA\s*RETIDO\s*NA\s*FONTE')
+
+    if total_rend:
+        add('Rendimentos Tributáveis PJ', '', 'Previdência Complementar',
+            '01', 'Total dos Rendimentos',
+            valor_2025=total_rend, tipo_rendimento='Tributável')
+    if prev_priv:
+        add('Rendimentos Tributáveis PJ', '', 'Deduções',
+            '03', 'Contribuição à Previdência Privada',
+            valor_2025=prev_priv, tipo_rendimento='Dedução')
+    if irrf:
+        add('Rendimentos Tributáveis PJ', '', 'Imposto',
+            '05', 'IR Retido na Fonte (IRRF)',
+            valor_2025=irrf, irrf=irrf, tipo_rendimento='Tributável')
+
+    # ── Quadro 4: Rendimentos Isentos ─────────────────────────────────────
+    apos_isenta = _v(r'01\.\s*PARCELA\s*ISENTA\s*DOS\s*PROVENTOS')
+    abono13     = _v(r'02\.\s*PARCELA\s*ISENTA.*?13')
+    apos_molest = _v(r'04\.\s*PENS[AÃ]O.*?MOLÉSTIA')
+    outros_is   = _v(r'07\.\s*OUTROS')
+
+    for val, cod, desc in [
+        (apos_isenta, '01', 'Parcela Isenta Aposentadoria/Pensão (65+)'),
+        (abono13,     '02', 'Parcela Isenta 13º Abono Anual Aposentadoria'),
+        (apos_molest, '04', 'Aposentadoria por Moléstia Grave'),
+        (outros_is,   '07', 'Outros Rendimentos Isentos'),
+    ]:
+        if val:
+            add('Rendimentos Isentos', '', 'Rendimentos Isentos e Não Tributáveis',
+                cod, desc, rendimento=val, tipo_rendimento='Isento')
+
+    # ── Quadro 5: Rendimentos Tributação Exclusiva ─────────────────────────
+    dec13      = _v(r'01\.\s*D[EÉ]CIMO\s*TERCEIRO\s*SAL[AÁ]RIO')
+    irrf13     = _v(r'02\.\s*IRRF\s*SOBRE\s*D[EÉ]CIMO\s*TERCEIRO')
+    outros_exc = _v(r'03\.\s*OUTROS')
+
+    if dec13:
+        add('Rendimentos Tributação Exclusiva', '', 'Rendimentos Exclusivos',
+            '01', '13º Salário / Abono Anual',
+            rendimento=dec13, irrf=irrf13, tipo_rendimento='Tributação Exclusiva')
+    if outros_exc:
+        add('Rendimentos Tributação Exclusiva', '', 'Rendimentos Exclusivos',
+            '03', 'Outros (PLA/PLR)',
+            rendimento=outros_exc, tipo_rendimento='Tributação Exclusiva')
+
+    # If nothing was extracted (all zeros), still return one entry to confirm parsing
+    if not entries:
+        add('Rendimentos Tributáveis PJ', '', 'Previdência Complementar',
+            '01', 'Total dos Rendimentos (zerado)',
+            valor_2025=0.0, tipo_rendimento='Tributável')
+
+    return entries
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# INSS  (Comprovante de Rendimentos – Fundo do Regime Geral de Previdência)
+# Format: Ministério da Fazenda / Receita Federal – numbered fields
+# ─────────────────────────────────────────────────────────────────────────────
+
+def parse_inss(filename: str, pages_text: list[str],
+               pages_tables: list[list]) -> list[Entry]:
+    text = '\n'.join(pages_text)
+    entries: list[Entry] = []
+
+    cnpj = '16.727.230/0001-97'
+    inst = 'INSS – Fundo do Regime Geral de Previdência Social'
+    ano = extract_year(text)
+
+    def _v(pattern: str) -> float:
+        m = re.search(pattern + r'[^\n]*([\d.]+,\d{2}|\d+,\d{2})', text, re.IGNORECASE | re.DOTALL)
+        return parse_brl(m.group(1)) if m else 0.0
+
+    def _v_bare(pattern: str) -> float:
+        """Match value directly after pattern on same or next line (no label prefix)."""
+        m = re.search(pattern + r'\s+([\d.]+,\d{2}|\d{1,10},\d{2})', text, re.IGNORECASE)
+        return parse_brl(m.group(1)) if m else 0.0
+
+    def add(secao, grupo, gdesc, codigo, cdesc, **kw):
+        entries.append(_entry(filename, inst, cnpj, ano,
+                               secao, grupo, gdesc, codigo, cdesc,
+                               fonte_pagadora=inst, cnpj_fonte=cnpj, **kw))
+
+    # ── Quadro 3: Rendimentos Tributáveis ─────────────────────────────────
+    total_rend = _v_bare(r'1\s*-\s*Total de Rendimentos.*?férias\)')
+    inss_dedu  = _v(r'2\s*-\s*Contribui[cç][aã]o Previdenci[aá]ria Oficial')
+    prev_priv  = _v(r'3\s*-\s*Contribui[cç][aã]o.*?Previd[eê]ncia Privada')
+    irrf       = _v(r'5\s*-\s*Imposto Retido na Fonte')
+
+    if total_rend:
+        add('Rendimentos Tributáveis PJ', '', 'Proventos de Aposentadoria/Pensão',
+            '01', 'Total dos Rendimentos (incl. férias)',
+            valor_2025=total_rend, tipo_rendimento='Tributável')
+    if inss_dedu:
+        add('Rendimentos Tributáveis PJ', '', 'Deduções',
+            '02', 'Contribuição Previdenciária Oficial (INSS)',
+            valor_2025=inss_dedu, tipo_rendimento='Dedução')
+    if prev_priv:
+        add('Rendimentos Tributáveis PJ', '', 'Deduções',
+            '03', 'Contribuição à Previdência Privada / FAPI',
+            valor_2025=prev_priv, tipo_rendimento='Dedução')
+    if irrf:
+        add('Rendimentos Tributáveis PJ', '', 'Imposto',
+            '05', 'IR Retido na Fonte (IRRF)',
+            valor_2025=irrf, irrf=irrf, tipo_rendimento='Tributável')
+
+    # ── Quadro 4: Rendimentos Isentos ─────────────────────────────────────
+    apos_isenta = _v_bare(r'1\s*-\s*Parcela Isenta dos Proventos.*?Pensão.*?(?:mais\)[\s,]*)')
+    outros_is   = _v(r'(?:6|7)\s*-\s*Outros\s*$')
+
+    if apos_isenta:
+        add('Rendimentos Isentos', '', 'Rendimentos Isentos e Não Tributáveis',
+            '01', 'Parcela Isenta Aposentadoria/Pensão (65+)',
+            rendimento=apos_isenta, tipo_rendimento='Isento')
+    if outros_is:
+        add('Rendimentos Isentos', '', 'Rendimentos Isentos e Não Tributáveis',
+            '07', 'Outros Rendimentos Isentos',
+            rendimento=outros_is, tipo_rendimento='Isento')
+
+    # If nothing was extracted, still return an entry to confirm parsing
+    if not entries:
+        add('Rendimentos Tributáveis PJ', '', 'Proventos de Aposentadoria/Pensão',
+            '01', 'Total dos Rendimentos (zerado)',
+            valor_2025=0.0, tipo_rendimento='Tributável')
 
     return entries
 

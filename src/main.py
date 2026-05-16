@@ -99,6 +99,69 @@ def _read_job(job_id: str) -> dict[str, Any] | None:
         return dict(job) if job else None
 
 
+def validate_single_taxpayer(entries: list) -> tuple[bool, str, dict[str, list[str]]]:
+    """Validate that all entries belong to the same taxpayer.
+    
+    Args:
+        entries: List of Entry objects
+        
+    Returns:
+        (is_valid, message, conflicts_dict)
+        - is_valid: True if all entries have same taxpayer info
+        - message: Human-readable validation message
+        - conflicts_dict: Dict with keys 'nome' and 'cpf', each containing 
+                         list of distinct values found (empty if valid)
+    """
+    if not entries:
+        return True, "Nenhuma entrada para validar", {}
+    
+    # Collect distinct taxpayer info from entries with data
+    distinct_names = set()
+    distinct_cpfs = set()
+    files_by_name = {}
+    files_by_cpf = {}
+    
+    for entry in entries:
+        nome = entry.nome_contribuinte or ""
+        cpf = entry.cpf_contribuinte or ""
+        
+        if nome:
+            distinct_names.add(nome)
+            if nome not in files_by_name:
+                files_by_name[nome] = []
+            files_by_name[nome].append(entry.arquivo)
+        
+        if cpf:
+            distinct_cpfs.add(cpf)
+            if cpf not in files_by_cpf:
+                files_by_cpf[cpf] = []
+            files_by_cpf[cpf].append(entry.arquivo)
+    
+    conflicts = {}
+    messages = []
+    
+    # Check name consistency
+    if len(distinct_names) > 1:
+        conflicts['nome'] = sorted(distinct_names)
+        conflicts_str = ", ".join(sorted(distinct_names))
+        messages.append(f"⚠️  Nomes diferentes encontrados: {conflicts_str}")
+    elif distinct_names:
+        messages.append(f"✅ Nome do contribuinte: {distinct_names.pop()}")
+    
+    # Check CPF consistency  
+    if len(distinct_cpfs) > 1:
+        conflicts['cpf'] = sorted(distinct_cpfs)
+        conflicts_str = ", ".join(sorted(distinct_cpfs))
+        messages.append(f"⚠️  CPFs diferentes encontrados: {conflicts_str}")
+    elif distinct_cpfs:
+        messages.append(f"✅ CPF do contribuinte: {distinct_cpfs.pop()}")
+    
+    is_valid = len(distinct_names) <= 1 and len(distinct_cpfs) <= 1
+    message = "\n".join(messages) if messages else "Validação concluída (sem dados de contribuinte)"
+    
+    return is_valid, message, conflicts
+
+
 def _update_job(job_id: str, **updates: Any) -> None:
     """Patch job state with the provided fields."""
     with _JOBS_LOCK:
@@ -402,6 +465,17 @@ def _run_pipeline(
 
     if not all_entries:
         raise RuntimeError('Nenhuma entrada válida. Encerrando sem gerar planilha.')
+
+    # Validate that all entries belong to the same taxpayer
+    print('\nValidando dados do contribuinte...')
+    is_valid, validation_msg, conflicts = validate_single_taxpayer(all_entries)
+    for line in validation_msg.split('\n'):
+        print(f'  {line}')
+    if not is_valid:
+        print('\n⚠️  Aviso: Encontrados documentos de múltiplos contribuintes!')
+        print(f'   Nomes: {", ".join(conflicts.get("nome", []))}')
+        print(f'   CPFs: {", ".join(conflicts.get("cpf", []))}')
+        print('   → Verifique se todos os documentos são da mesma pessoa.')
 
     print('\nGerando planilha XLSX...')
     notify('Gerando planilha XLSX')

@@ -19,6 +19,10 @@ class Entry:
     codigo: str             # Código number, e.g. "02"
     codigo_desc: str        # Código description
 
+    # ── Contribuinte (Document Owner) ────────────────────────────────────────
+    nome_contribuinte: str = ""  # Name of the taxpayer
+    cpf_contribuinte: str = ""   # CPF of the taxpayer (formatted: XXX.XXX.XXX-XX)
+
     # ── Fonte Pagadora ────────────────────────────────────────────────────────
     fonte_pagadora: str = ""
     cnpj_fonte: str = ""
