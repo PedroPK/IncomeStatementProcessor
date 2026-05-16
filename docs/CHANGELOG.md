@@ -5,6 +5,100 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere a [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.3.0] - 2026-05-16
+
+### ✨ Adicionado
+
+#### Validação de Contribuinte Único
+- **`validate_single_taxpayer(entries)`** em `src/main.py`: Verifica que todas as entradas do processamento pertencem ao mesmo contribuinte
+  - Compara `nome_contribuinte` e `cpf_contribuinte` em todas as entradas
+  - Retorna `(is_valid: bool, mensagem: str, conflitos: dict)`
+  - Integrado ao pipeline principal: exibe aviso ao usuário caso haja inconsistências
+
+- **Campos no modelo `Entry`** (`src/models.py`):
+  - `nome_contribuinte: str = ""` — Nome completo do titular do informe
+  - `cpf_contribuinte: str = ""` — CPF formatado (`XXX.XXX.XXX-XX`)
+
+#### Extração Automática de Dados do Contribuinte
+- **`extract_taxpayer_info(text)`** em `src/normalizer.py`: Extrai nome e CPF do contribuinte a partir do texto de qualquer página de informe
+  - Passo 1: localiza CPF (formatado → mascarado → 11 dígitos brutos)
+  - Passo 2: busca nome nas primeiras 25 linhas via padrão `Nome :` ou linha com nome + CPF adjacente
+  - Passo 3: fallback para linha em maiúsculas sem dígitos (padrão FACHESF)
+  - Passo 4: fallback para padrões explícitos de label
+  - Todos os 9 parsers de PDF passaram a chamar `extract_taxpayer_info` e popular os campos acima em cada `Entry`
+
+#### Suporte para FACHESF e INSS
+- **Parser FACHESF** (`parse_fachesf`): Novo parser para informes da Fundação CHESF de Assistência e Seguridade Social
+  - Detectado automaticamente por `fachesf` ou `chesf` no nome do arquivo
+  - Extrai Quadro 3 (Rendimentos Tributáveis): total de rendimentos, contribuição à previdência privada, IRRF
+  - Extrai Quadro 4 (Rendimentos Isentos): parcela isenta de aposentadoria (65+), 13º isento, aposentadoria por moléstia
+  - Extrai Quadro 5 (Tributação Exclusiva): 13º salário/abono anual, outros (PLA/PLR)
+  - CNPJ da fonte: `42.160.192/0001-43`
+
+- **Parser INSS** (`parse_inss`): Novo parser para Comprovante de Rendimentos do Fundo do Regime Geral de Previdência Social
+  - Detectado automaticamente por `inss` no nome do arquivo ou `regime geral de previdencia` / `frgps` no texto
+  - Extrai Quadro 3 (Rendimentos Tributáveis): total de rendimentos (incl. férias), contribuição previdenciária oficial, IRRF
+  - Extrai Quadro 4 (Rendimentos Isentos): parcela isenta de aposentadoria/pensão (65+)
+  - CNPJ da fonte: `16.727.230/0001-97`
+
+### 🐛 Corrigido
+
+- **`normalizer.py` corrompido**: Arquivo foi completamente reescrito após acumulação de edições incrementais que resultaram em:
+  - Definições duplicadas de `extract_taxpayer_info()`
+  - Funções `clean()` e `extract_year()` aninhadas dentro de `extract_taxpayer_info()`, tornando-as inacessíveis a outros módulos
+  - `NameError: name 'clean' is not defined` ao chamar a segunda definição
+  - Solução: reescrita completa com todas as funções no nível de módulo
+
+- **Import incompleto em `parser.py`**: `clean` e `extract_year` eram usados em todo o arquivo mas não estavam no import de `src.normalizer`
+  - Corrigido: `from src.normalizer import parse_brl, find_cnpj, extract_taxpayer_info, clean, extract_year`
+
+- **`detect_institution()` sem fallback para novas fontes**: Retornava `'unknown'` para FACHESF e INSS, gerando entradas com `secao='Desconhecido'` que eram filtradas pelo pipeline, causando erro `'Nenhuma entrada válida'`
+
+## [1.2.3] - 2026-05-16
+
+### 🐛 Corrigido
+
+#### Filtragem de Artefatos macOS em ZIPs
+- **`_is_metadata_entry()` em `src/extractor.py`**: Nova função que detecta e descarta silenciosamente entradas de ZIP que não são dados reais
+  - Diretórios `__MACOSX/` criados pelo macOS ao compactar via Finder
+  - Arquivos `._*` (AppleDouble sidecar / resource forks)
+  - `.DS_Store` e `Thumbs.db`
+  - Qualquer entrada que seja diretório (apenas arquivos são extraídos)
+
+#### Resiliência no Parsing de PDFs
+- **Exceções por arquivo não abortam o batch**: Erros em um PDF individual são capturados e registrados, o pipeline continua com os demais arquivos
+- **Rastreamento de progresso corrigido**: Progresso agora é contabilizado corretamente para todos os desfechos (sucesso, erro, resultado vazio)
+- **Novo teste**: `src/tests/test_zip_and_parse_resilience.py`
+  - Testa filtragem de artefatos (8 casos: `__MACOSX`, `._`, `.DS_Store`, etc.)
+  - Testa que exceção em um arquivo não interrompe processamento dos demais
+
+## [1.2.2] - 2026-05-15
+
+### ✨ Adicionado
+
+#### Interface Web com Fluxo de Upload (Web-First)
+- **Servidor Flask local** (`_run_web_mode()`): `python3 -m src.main` agora abre automaticamente um navegador com UI de arrasta-e-solta
+  - Escolha entre processar arquivos de `input/` ou fazer upload manual
+  - Drag-and-drop de PDFs individuais ou ZIPs
+  - Feedback visual em tempo real durante o processamento
+  - Exibe link direto para o dashboard HTML gerado
+  - Fallback com mensagem de erro clara se Flask não estiver instalado
+
+- **Modo CLI preservado** (`_run_cli_mode()`): comportamento original acessível via flag `--cli`
+  - `python3 -m src.main --cli` processa `input/` imediatamente sem abrir navegador
+
+- **Novas funções auxiliares em `src/main.py`**:
+  - `_merge_file_maps(base, extra)`: mescla file maps sem colisão de nomes (renomeia duplicatas)
+  - `_collect_upload_file_map(uploaded_paths)`: normaliza lista de uploads (PDFs avulsos + ZIPs) em file map unificado
+  - `_parse_file_map(file_map, config)`: extrai lógica de parsing em função reutilizável
+  - `_run_pipeline(file_map, config)`: executa pipeline completo e retorna resultado serializável como JSON
+
+- **Dependência adicionada**: `flask` em `requirements.txt`
+
+### 🔧 Melhorado
+
+- **`src/dashboard_generator.py`**: Ajustes de layout e estilo na UI do stepper web
+
 ## [1.2.1] - 2026-05-07
 
 ### 🐛 Corrigido

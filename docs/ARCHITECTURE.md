@@ -110,12 +110,15 @@ def detect_institution(filename: str, first_page: str) -> str
 
 | Instituição | Pattern |
 |---|---|
-| Accenture | `accenture` (case-insensitive) |
-| Avenue | `avenue` |
-| Inter | `inter` |
-| NuBank | `nubank` |
-| XP | `xp` + (não contém "previdência") |
-| XP Previdência | `xp` + `previdência` |
+| Accenture | `accenture` no filename |
+| Avenue | `avenue` no filename |
+| Clear | `clear` no filename ou `www.clear.com.br` no texto |
+| Inter | `inter` no filename |
+| NuBank | `nubank` ou `nu bank` no filename |
+| XP | `xp` no filename (sem `previdência`) |
+| XP Previdência | `xp` + `prev`/`previd` no filename |
+| FACHESF | `fachesf` ou `chesf` no filename, ou `fundacao chesf` no texto |
+| INSS | `inss` no filename, ou `regime geral de previdencia`/`frgps` no texto |
 
 **Dispatcher Principal:**
 
@@ -195,6 +198,18 @@ Cada parser implementa interface comum:
 def parse_BANCO(filename: str, pages_text: list[str],
                 pages_tables: list[list]) -> list[Entry]
 ```
+
+| Parser | Instituição | Quadros Extraídos |
+|---|---|---|
+| `parse_accenture` | Accenture do Brasil | Q3 Tributáveis, Q4 Isentos, Q5 Exclusivos |
+| `parse_clear` | Clear Corretora | Informe + Custódia |
+| `parse_inter` | Banco Inter | Q3 Tributáveis, Q4 Isentos |
+| `parse_nubank` | NuBank | Q3 Tributáveis, Q4 Isentos |
+| `parse_xp` | XP Investimentos | Q3 Tributáveis, Q4 Isentos, Bens e Direitos |
+| `parse_xp_previdencia` | XP Previdência | Q3 Tributáveis, Q4 Isentos, Q5 Exclusivos |
+| `parse_avenue` | Avenue Securities | Q3 Tributáveis, Bens e Direitos (exterior) |
+| `parse_fachesf` | FACHESF | Q3 Tributáveis, Q4 Isentos, Q5 Exclusivos |
+| `parse_inss` | INSS / FRGPS | Q3 Tributáveis, Q4 Isentos |
 
 ---
 
