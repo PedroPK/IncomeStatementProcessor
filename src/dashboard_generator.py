@@ -312,6 +312,53 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
             text-align: right;
             font-family: 'Courier New', monospace;
         }}
+
+        /* ── Dados Brutos: sortable headers ──────────────────────────────── */
+        #dados-brutos th.sortable {{
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+        }}
+        #dados-brutos th.sortable:hover {{
+            background-color: var(--primary-color) !important;
+            color: white !important;
+        }}
+        #dados-brutos th.sortable .sort-icon {{
+            display: inline-block;
+            margin-left: 4px;
+            opacity: 0.35;
+            font-size: 0.72em;
+        }}
+        #dados-brutos th.sortable.asc .sort-icon,
+        #dados-brutos th.sortable.desc .sort-icon {{
+            opacity: 1;
+        }}
+        /* ── Dados Brutos: filter row ──────────────────────────────────────── */
+        #dados-brutos thead tr.filter-row th {{
+            padding: 3px 6px;
+            background: inherit;
+        }}
+        #dados-brutos thead tr.filter-row input {{
+            width: 100%;
+            padding: 3px 6px;
+            font-size: 0.78em;
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            background: var(--bg-light);
+            color: var(--text-light);
+            box-sizing: border-box;
+        }}
+        html.dark-mode #dados-brutos thead tr.filter-row input {{
+            background: #2a2a2a;
+            border-color: #555;
+            color: #ddd;
+        }}
+        #dados-brutos .brutos-no-results {{
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+            color: #999;
+        }}
         
         .section-header {{
             background-color: var(--primary-color);
@@ -484,18 +531,29 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                 <!-- Tab 1: Dados Brutos -->
                 <div id="dados-brutos" class="tab-content active">
                     <div class="table-responsive">
-                        <table class="table table-striped table-hover">
+                        <table class="table table-striped table-hover" id="table-brutos">
                             <thead>
                                 <tr>
-                                    <th>Arquivo</th>
-                                    <th>Instituição</th>
-                                    <th>Seção</th>
-                                    <th>Grupo</th>
-                                    <th>Código</th>
-                                    <th>Descrição</th>
-                                    <th class="currency">2024</th>
-                                    <th class="currency">2025</th>
-                                    <th class="currency">Rendimento</th>
+                                    <th class="sortable" data-col="arquivo">Arquivo <span class="sort-icon">↕</span></th>
+                                    <th class="sortable" data-col="instituicao">Instituição <span class="sort-icon">↕</span></th>
+                                    <th class="sortable" data-col="secao">Seção <span class="sort-icon">↕</span></th>
+                                    <th class="sortable" data-col="grupo">Grupo <span class="sort-icon">↕</span></th>
+                                    <th class="sortable" data-col="codigo">Código <span class="sort-icon">↕</span></th>
+                                    <th class="sortable" data-col="descricao">Descrição <span class="sort-icon">↕</span></th>
+                                    <th class="sortable currency" data-col="v2024">2024 <span class="sort-icon">↕</span></th>
+                                    <th class="sortable currency" data-col="v2025">2025 <span class="sort-icon">↕</span></th>
+                                    <th class="sortable currency" data-col="rendimento">Rendimento <span class="sort-icon">↕</span></th>
+                                </tr>
+                                <tr class="filter-row">
+                                    <th><input type="text" data-col="arquivo" placeholder="filtrar…"></th>
+                                    <th><input type="text" data-col="instituicao" placeholder="filtrar…"></th>
+                                    <th><input type="text" data-col="secao" placeholder="filtrar…"></th>
+                                    <th><input type="text" data-col="grupo" placeholder="filtrar…"></th>
+                                    <th><input type="text" data-col="codigo" placeholder="filtrar…"></th>
+                                    <th><input type="text" data-col="descricao" placeholder="filtrar…"></th>
+                                    <th><input type="text" data-col="v2024" placeholder="ex: >1000"></th>
+                                    <th><input type="text" data-col="v2025" placeholder="ex: >1000"></th>
+                                    <th><input type="text" data-col="rendimento" placeholder="ex: >0"></th>
                                 </tr>
                             </thead>
                             <tbody id="tbody-brutos"></tbody>
@@ -654,11 +712,68 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
             event.target.classList.add('active');
         }}
 
-        // Populate tabs
-        function populateTabs() {{
-            // Tab 1: Dados Brutos
+        // ── Dados Brutos: sorting + filtering ────────────────────────────────
+        const _BRUTOS_COLS = ['arquivo','instituicao','secao','grupo','codigo','descricao','v2024','v2025','rendimento'];
+        const _BRUTOS_NUMERIC = new Set(['v2024','v2025','rendimento']);
+        let _brutosSort  = {{ col: null, dir: 1 }};   // dir: 1=asc, -1=desc
+        let _brutosFilters = {{}};                       // col -> string
+
+        function _parseNumericFilter(expr, value) {{
+            // Supports: >500  >=500  <500  <=500  =500  500 (bare → >=)
+            const m = expr.trim().match(/^([><=!]=?)?(-?[\d.,]+)$/);
+            if (!m) return true;    // invalid expr → don't filter
+            const op  = m[1] || '>=';
+            const ref = parseFloat(m[2].replace(/\./g,'').replace(',','.'));
+            if (isNaN(ref)) return true;
+            switch (op) {{
+                case '>':  return value >  ref;
+                case '>=': return value >= ref;
+                case '<':  return value <  ref;
+                case '<=': return value <= ref;
+                case '=':
+                case '==': return value === ref;
+                case '!=': return value !== ref;
+            }}
+            return true;
+        }}
+
+        function renderDadosBrutos() {{
+            // 1. Filter
+            let rows = mockData.filter(row => {{
+                for (const col of _BRUTOS_COLS) {{
+                    const f = (_brutosFilters[col] || '').trim();
+                    if (!f) continue;
+                    if (_BRUTOS_NUMERIC.has(col)) {{
+                        if (!_parseNumericFilter(f, row[col] || 0)) return false;
+                    }} else {{
+                        const cell = (row[col] || '').toString().toLowerCase();
+                        if (!cell.includes(f.toLowerCase())) return false;
+                    }}
+                }}
+                return true;
+            }});
+
+            // 2. Sort
+            if (_brutosSort.col) {{
+                const col = _brutosSort.col;
+                const dir = _brutosSort.dir;
+                rows = [...rows].sort((a, b) => {{
+                    const va = _BRUTOS_NUMERIC.has(col) ? (a[col] || 0) : (a[col] || '').toString().toLowerCase();
+                    const vb = _BRUTOS_NUMERIC.has(col) ? (b[col] || 0) : (b[col] || '').toString().toLowerCase();
+                    if (va < vb) return -dir;
+                    if (va > vb) return  dir;
+                    return 0;
+                }});
+            }}
+
+            // 3. Render
             const tbody = document.getElementById('tbody-brutos');
-            mockData.forEach(row => {{
+            tbody.innerHTML = '';
+            if (rows.length === 0) {{
+                tbody.innerHTML = '<tr><td colspan="9" class="brutos-no-results">Nenhum resultado para os filtros aplicados.</td></tr>';
+                return;
+            }}
+            rows.forEach(row => {{
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${{row.arquivo}}</td>
@@ -673,6 +788,43 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                 `;
                 tbody.appendChild(tr);
             }});
+        }}
+
+        function initDadosBrutosSortFilter() {{
+            // Sort: header click
+            document.querySelectorAll('#dados-brutos th.sortable').forEach(th => {{
+                th.addEventListener('click', () => {{
+                    const col = th.dataset.col;
+                    if (_brutosSort.col === col) {{
+                        _brutosSort.dir *= -1;
+                    }} else {{
+                        _brutosSort = {{ col, dir: 1 }};
+                    }}
+                    // Update header indicators
+                    document.querySelectorAll('#dados-brutos th.sortable').forEach(h => {{
+                        h.classList.remove('asc','desc');
+                        h.querySelector('.sort-icon').textContent = '↕';
+                    }});
+                    th.classList.add(_brutosSort.dir === 1 ? 'asc' : 'desc');
+                    th.querySelector('.sort-icon').textContent = _brutosSort.dir === 1 ? '↑' : '↓';
+                    renderDadosBrutos();
+                }});
+            }});
+
+            // Filter: input events
+            document.querySelectorAll('#dados-brutos thead tr.filter-row input').forEach(input => {{
+                input.addEventListener('input', () => {{
+                    _brutosFilters[input.dataset.col] = input.value;
+                    renderDadosBrutos();
+                }});
+            }});
+        }}
+
+        // Populate tabs
+        function populateTabs() {{
+            // Tab 1: Dados Brutos
+            renderDadosBrutos();
+            initDadosBrutosSortFilter();
 
             // Tab 2: Resumo
             const resumo = {{}};
