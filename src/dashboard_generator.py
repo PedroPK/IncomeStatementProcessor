@@ -359,6 +359,25 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
             font-style: italic;
             color: #999;
         }}
+        #table-brutos tfoot tr.subtotal-row {{
+            font-weight: bold;
+            background-color: rgba(102, 126, 234, 0.15);
+            border-top: 2px solid var(--primary-color);
+        }}
+        #table-brutos tfoot tr.subtotal-row td {{
+            padding: 6px 8px;
+            color: var(--text-light);
+        }}
+        html.dark-mode #table-brutos tfoot tr.subtotal-row {{
+            background-color: rgba(102, 126, 234, 0.30);
+        }}
+        html.dark-mode #table-brutos tfoot tr.subtotal-row td {{
+            color: #d0d8ff;
+        }}
+        #table-brutos tfoot tr.subtotal-row td.subtotal-label {{
+            font-style: italic;
+            opacity: 0.85;
+        }}
         
         .section-header {{
             background-color: var(--primary-color);
@@ -559,6 +578,7 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                                 </tr>
                             </thead>
                             <tbody id="tbody-brutos"></tbody>
+                            <tfoot id="tfoot-brutos"></tfoot>
                         </table>
                     </div>
                 </div>
@@ -770,11 +790,14 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
 
             // 3. Render
             const tbody = document.getElementById('tbody-brutos');
+            const tfoot = document.getElementById('tfoot-brutos');
             tbody.innerHTML = '';
+            tfoot.innerHTML = '';
             if (rows.length === 0) {{
                 tbody.innerHTML = '<tr><td colspan="10" class="brutos-no-results">Nenhum resultado para os filtros aplicados.</td></tr>';
                 return;
             }}
+            let sub2024 = 0, sub2025 = 0, subRend = 0;
             rows.forEach(row => {{
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
@@ -790,7 +813,19 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                     <td class="currency">${{formatCurrency(row.rendimento)}}</td>
                 `;
                 tbody.appendChild(tr);
+                sub2024 += row.v2024 || 0;
+                sub2025 += row.v2025 || 0;
+                subRend += row.rendimento || 0;
             }});
+            const tfootTr = document.createElement('tr');
+            tfootTr.className = 'subtotal-row';
+            tfootTr.innerHTML = `
+                <td colspan="7" class="subtotal-label">SubTotal (${{rows.length}} registro${{rows.length !== 1 ? 's' : ''}})</td>
+                <td class="currency">${{formatCurrency(sub2024)}}</td>
+                <td class="currency">${{formatCurrency(sub2025)}}</td>
+                <td class="currency">${{formatCurrency(subRend)}}</td>
+            `;
+            tfoot.appendChild(tfootTr);
         }}
 
         function initDadosBrutosSortFilter() {{
