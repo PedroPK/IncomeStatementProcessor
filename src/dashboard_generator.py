@@ -540,6 +540,7 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                                     <th class="sortable" data-col="grupo">Grupo <span class="sort-icon">↕</span></th>
                                     <th class="sortable" data-col="codigo">Código <span class="sort-icon">↕</span></th>
                                     <th class="sortable" data-col="descricao">Descrição <span class="sort-icon">↕</span></th>
+                                    <th class="sortable" data-col="discriminacao">Título <span class="sort-icon">↕</span></th>
                                     <th class="sortable currency" data-col="v2024">2024 <span class="sort-icon">↕</span></th>
                                     <th class="sortable currency" data-col="v2025">2025 <span class="sort-icon">↕</span></th>
                                     <th class="sortable currency" data-col="rendimento">Rendimento <span class="sort-icon">↕</span></th>
@@ -551,6 +552,7 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                                     <th><input type="text" data-col="grupo" placeholder="filtrar…"></th>
                                     <th><input type="text" data-col="codigo" placeholder="filtrar…"></th>
                                     <th><input type="text" data-col="descricao" placeholder="filtrar…"></th>
+                                    <th><input type="text" data-col="discriminacao" placeholder="filtrar…"></th>
                                     <th><input type="text" data-col="v2024" placeholder="ex: >1000"></th>
                                     <th><input type="text" data-col="v2025" placeholder="ex: >1000"></th>
                                     <th><input type="text" data-col="rendimento" placeholder="ex: >0"></th>
@@ -713,7 +715,7 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
         }}
 
         // ── Dados Brutos: sorting + filtering ────────────────────────────────
-        const _BRUTOS_COLS = ['arquivo','instituicao','secao','grupo','codigo','descricao','v2024','v2025','rendimento'];
+        const _BRUTOS_COLS = ['arquivo','instituicao','secao','grupo','codigo','descricao','discriminacao','v2024','v2025','rendimento'];
         const _BRUTOS_NUMERIC = new Set(['v2024','v2025','rendimento']);
         let _brutosSort  = {{ col: null, dir: 1 }};   // dir: 1=asc, -1=desc
         let _brutosFilters = {{}};                       // col -> string
@@ -770,7 +772,7 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
             const tbody = document.getElementById('tbody-brutos');
             tbody.innerHTML = '';
             if (rows.length === 0) {{
-                tbody.innerHTML = '<tr><td colspan="9" class="brutos-no-results">Nenhum resultado para os filtros aplicados.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10" class="brutos-no-results">Nenhum resultado para os filtros aplicados.</td></tr>';
                 return;
             }}
             rows.forEach(row => {{
@@ -782,6 +784,7 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                     <td>${{row.grupo}}</td>
                     <td>${{row.codigo}}</td>
                     <td>${{row.descricao}}</td>
+                    <td>${{row.discriminacao || '-'}}</td>
                     <td class="currency">${{formatCurrency(row.v2024)}}</td>
                     <td class="currency">${{formatCurrency(row.v2025)}}</td>
                     <td class="currency">${{formatCurrency(row.rendimento)}}</td>
