@@ -5,20 +5,21 @@
 ```
 src/
   __init__.py
-  main.py                    # Orquestração principal
+  main.py                    # Orquestração principal (web + CLI)
   models.py                  # Data model (Entry)
-  extractor.py              # Extração de ZIP
-  parser.py                 # Parser de PDFs (6 instituições)
+  extractor.py              # Extração de ZIP (com filtro de artefatos macOS)
+  parser.py                 # Parser de PDFs (9 instituições)
   custodia_parser.py        # Parser de XLSX com dados de custódia
-  normalizer.py             # Normalização de valores
-  dashboard_generator.py    # Geração de dashboard HTML
+  normalizer.py             # Normalização de valores e extração de contribuinte
+  dashboard_generator.py    # Geração de dashboard HTML interativo
   sheets_writer.py          # Integração com Google Sheets
-  xlsx_writer.py            # Escrita de planilha XLSX
+  xlsx_writer.py            # Escrita de planilha XLSX (4 abas)
   
   tests/                    # Testes automatizados
     __init__.py
-    test_integration.py     # Testes de integração com dados mockados
-    test_dashboard.py       # Testes do dashboard
+    test_integration.py         # Testes de integração com dados mockados
+    test_dashboard.py           # Testes do dashboard
+    test_zip_and_parse_resilience.py  # Testes de resiliência (artefatos macOS, timeout)
   
   analysis/                 # Ferramentas de análise
     __init__.py
@@ -32,6 +33,15 @@ src/
   generators/               # Geradores de documentação
     __init__.py
     generate_dashboard_docs.py  # Documentação visual do dashboard
+
+scripts/                    # Scripts auxiliares e de desenvolvimento
+  explore_pdfs.py
+  process_ana_gloria.py
+  process_pipeline.py
+  test_dashboard.py
+  test_dashboard_v2.py
+  test_extraction.py
+  test_pipeline.py
 ```
 
 ## 📐 Visão Geral do Pipeline
@@ -216,10 +226,27 @@ def parse_BANCO(filename: str, pages_text: list[str],
 ### 3. Camada de Saída (`xlsx_writer.py`, `dashboard_generator.py`)
 
 **XLSX Generation:**
-- Aba 1: Dados Brutos (59 entradas, 19 colunas)
+- Aba 1: Dados Brutos (todas as entradas, 19 colunas)
 - Aba 2: Resumo (Seção × Instituição)
 - Aba 3: Totais (Grupo × Código)
-- Aba 4: Para IRPF (Agrupado por instituição)
+- Aba 4: Para IRPF (Agrupado por instituição, com rótulos de renda fixa derivados de `discriminacao`)
+
+**Rótulos de Renda Fixa (`_renda_fixa_subtype`):**
+
+Ativos de Renda Fixa com Grupo `04` e Código `02`/`03` são diferenciados por subtipo derivado da `discriminacao`:
+
+| Palavra-chave em discriminacao | Rótulo exibido |
+|---|---|
+| TESOURO + SELIC | Tesouro Selic |
+| TESOURO + IPCA | Tesouro IPCA+ |
+| TESOURO + PREFIXADO | Tesouro Prefixado |
+| TESOURO (genérico) | Tesouro Direto |
+| CDB | CDB – Certificado de Depósito Bancário |
+| RDB | RDB – Recibo de Depósito Bancário |
+| LCI | LCI – Letra de Crédito Imobiliário |
+| LCA | LCA – Letra de Crédito do Agronegócio |
+| CRI | CRI – Certificado de Recebíveis Imobiliários |
+| CRA | CRA – Certificado de Recebíveis do Agronegócio |
 
 **Dashboard HTML:**
 - 4 cards de métricas-chave
@@ -227,16 +254,49 @@ def parse_BANCO(filename: str, pages_text: list[str],
 - Gráfico Barras (evolução 2024 vs 2025)
 - 4 abas de dados com formatação responsiva
 
+**Aba Dados Brutos – Funcionalidades Interativas:**
+- **Ordenação por coluna**: clique no cabeçalho `↕` ordena crescente/decrescente
+- **Filtragem por coluna**: linha de inputs abaixo do cabeçalho; suporte a texto livre e expressões numéricas (`>1000`, `<500`)
+- **Coluna Discriminação**: visível na tabela para facilitar filtragem de ativos específicos
+- **Linha de subtotal** (`<tfoot>`): exibe soma de 2024, 2025 e Rendimento das linhas visíveis (atualizada dinamicamente com os filtros)
+
+**Aba Para IRPF:**
+- Agregação por `(Grupo, Código, rótulo_derivado)` — para renda fixa, o rótulo vem de `irpfDisplayLabel()` (dashboard) / `_renda_fixa_subtype()` (XLSX), separando Tesouro Selic/Prefixado/IPCA+ e CDB em linhas distintas
+
 ---
 
-### 4. Módulos de Teste e Análise
+### 4. Pipeline de Processamento (`main.py`)
+
+**Controle de Stall Timeout:**
+- Cada arquivo PDF/XLSX é processado em thread isolada via `ThreadPoolExecutor`
+- Se o parsing travar sem retornar, o arquivo é ignorado e o pipeline continua
+- Configurável via `config.toml`:
+  ```toml
+  [processing]
+  stall_timeout_seconds = 60
+  ```
+
+**Fluxo resumido:**
+```
+_run_pipeline(file_map, config)
+  → _parse_file_map(file_map, callback, stall_timeout)
+      ├── PDF: ThreadPoolExecutor (timeout/erro → registra, continua)
+      └── XLSX: parse_custodia_xlsx
+  → validate_single_taxpayer(entries)
+  → write_xlsx + generate_dashboard_html
+```
+
+---
+
+### 5. Módulos de Teste e Análise
 
 #### Tests (`src/tests/`)
 - `test_integration.py`: Dados mockados (12 entradas)
 - `test_dashboard.py`: Testes de geração HTML
+- `test_zip_and_parse_resilience.py`: Testes de artefatos macOS e resiliência
 
 #### Analysis (`src/analysis/`)
-- `analyze_clear_pdf.py`: Inspção de PDF da Clear
+- `analyze_clear_pdf.py`: Inspeção de PDF da Clear
 - `analyze_mapping.py`: Mapeamento de campos
 
 #### Examples (`src/examples/`)

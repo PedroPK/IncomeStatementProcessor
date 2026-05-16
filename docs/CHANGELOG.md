@@ -5,6 +5,54 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere a [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.4.0] - 2026-05-16
+
+### ✨ Adicionado
+
+#### Dashboard – Ordenação e Filtragem na Tabela de Dados Brutos
+- **Cabeçalhos clicáveis** (`↕`) na aba "Dados Brutos": clique em qualquer coluna para ordenar crescente/decrescente, com indicador visual de direção
+- **Linha de filtro por coluna**: inputs abaixo do cabeçalho permitem filtrar em tempo real por texto (Arquivo, Instituição, Seção, etc.) ou por expressão numérica (`>1000`, `<500`) nas colunas de valor
+- **Coluna Discriminação** adicionada à tabela de Dados Brutos, permitindo filtrar e ordenar pelo campo de discriminação de cada ativo
+- **Mensagem de "nenhum resultado"** exibida quando os filtros ativos não retornam linhas
+- Estilos adaptativos para modo claro e escuro (dark mode)
+
+#### Dashboard – Linha de Subtotal
+- **Linha de subtotal** (`<tfoot>`) ao final da tabela de Dados Brutos: exibe a soma de 2024, 2025 e Rendimento para as linhas atualmente visíveis (respeitando filtros)
+- Destaque visual diferenciado (fundo azul translúcido, borda superior em destaque) com suporte a dark mode
+
+#### Rótulos de Exibição para Ativos de Renda Fixa
+- **`irpfDisplayLabel(r)`** no dashboard (JavaScript): deriva um rótulo de exibição a partir de `discriminacao` para ativos de Renda Fixa com código 04/02 ou 04/03
+  - Tesouro Selic, Tesouro IPCA+, Tesouro Prefixado, Tesouro Direto (genérico)
+  - CDB – Certificado de Depósito Bancário
+  - RDB – Recibo de Depósito Bancário
+  - LCI – Letra de Crédito Imobiliário
+  - LCA – Letra de Crédito do Agronegócio
+  - CRI – Certificado de Recebíveis Imobiliários
+  - CRA – Certificado de Recebíveis do Agronegócio
+  - Esses ativos agora aparecem como **linhas separadas** na aba "Para IRPF" do dashboard, em vez de serem consolidados sob o mesmo código
+
+- **`_renda_fixa_subtype(discriminacao)`** em `src/xlsx_writer.py`: mesma lógica de derivação de rótulo aplicada na geração da aba "Para IRPF" do XLSX exportado
+  - Agregação na aba Para IRPF agora usa chave `(Grupo, Código, label_derivado)` para renda fixa, mantendo separação por subtipo
+
+#### Stall Timeout no Pipeline de Processamento
+- **`stall_timeout` em `_parse_file_map()`** (`src/main.py`): cada arquivo PDF/XLSX é processado com timeout de isolamento via `ThreadPoolExecutor`
+  - Se o parsing de um arquivo travar por mais de N segundos sem retornar, ele é ignorado e o pipeline continua com os demais
+  - Arquivo problemático registrado em `errors` com mensagem `[timeout]`
+  - Configurável via `config.toml` → `[processing].stall_timeout_seconds` (padrão: `60`)
+- **Nova seção `[processing]`** em `config.toml`:
+  ```toml
+  [processing]
+  stall_timeout_seconds = 60
+  ```
+
+#### Reorganização de Scripts Auxiliares
+- Scripts avulsos movidos para a pasta `scripts/`:
+  - `explore_pdfs.py`, `process_ana_gloria.py`, `process_pipeline.py`
+  - `test_dashboard.py`, `test_dashboard_v2.py`, `test_extraction.py`, `test_pipeline.py`
+- `.gitignore` atualizado para refletir nova localização
+
+---
+
 ## [1.3.0] - 2026-05-16
 
 ### ✨ Adicionado
