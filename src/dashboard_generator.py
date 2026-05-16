@@ -931,6 +931,19 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                     secaoDiv.textContent = secao;
                     irpfContent.appendChild(secaoDiv);
 
+                    // Accumulate section and institution totals before rendering
+                    const secaoTotal = {{ v2024: 0, v2025: 0, rendimento: 0, irrf: 0 }};
+                    secaoRows.forEach(r => {{
+                        secaoTotal.v2024      += r.v2024      || 0;
+                        secaoTotal.v2025      += r.v2025      || 0;
+                        secaoTotal.rendimento += r.rendimento || 0;
+                        secaoTotal.irrf       += r.irrf       || 0;
+                        instTotal.v2024       += r.v2024      || 0;
+                        instTotal.v2025       += r.v2025      || 0;
+                        instTotal.rendimento  += r.rendimento || 0;
+                        instTotal.irrf        += r.irrf       || 0;
+                    }});
+
                     const table = document.createElement('table');
                     table.className = 'table table-sm table-striped';
                     table.style.marginBottom = '15px';
@@ -948,10 +961,6 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                         </thead>
                         <tbody>
                             ${{secaoRows.map(r => {{
-                                instTotal.v2024 += r.v2024 || 0;
-                                instTotal.v2025 += r.v2025 || 0;
-                                instTotal.rendimento += r.rendimento || 0;
-                                instTotal.irrf += r.irrf || 0;
                                 const tickerMatch = r.discriminacao && r.discriminacao.match(/^([A-Z0-9]{{3,7}})\s*[\u2013-]/);
                                 const ticker = tickerMatch ? tickerMatch[1] : null;
                                 const descDisplay = ticker ? `<strong>${{ticker}}</strong> — ${{r.descricao}}` : r.descricao;
@@ -968,6 +977,15 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                                 `;
                             }}).join('')}}
                         </tbody>
+                        <tfoot>
+                            <tr style="font-weight: bold; background-color: var(--bg-light-card); border-top: 2px solid var(--border-light);">
+                                <td colspan="3">SubTotal ${{secao}}</td>
+                                <td class="currency">${{formatCurrency(secaoTotal.v2024)}}</td>
+                                <td class="currency">${{formatCurrency(secaoTotal.v2025)}}</td>
+                                <td class="currency">${{formatCurrency(secaoTotal.rendimento)}}</td>
+                                <td class="currency">${{formatCurrency(secaoTotal.irrf)}}</td>
+                            </tr>
+                        </tfoot>
                     `;
                     irpfContent.appendChild(table);
                 }});

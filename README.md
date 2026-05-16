@@ -117,8 +117,20 @@ token_file = "credentials/token.json"
 
 ### 3. Executar
 
+#### Modo Web (novo padrão)
+
 ```bash
 python3 -m src.main
+```
+
+Ao iniciar, a aplicação abre uma interface web local com Stepper:
+- Passo 1: escolher entre processar `input/` ou fazer drag-and-drop de PDF/ZIP
+- Passo 2: visualizar o dashboard existente após o processamento
+
+#### Modo CLI legado (processa `input/` direto)
+
+```bash
+python3 -m src.main --cli
 ```
 
 Saída esperada:

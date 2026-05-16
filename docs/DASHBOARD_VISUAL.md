@@ -302,10 +302,19 @@ python3 test_dashboard.py
 
 ## 🚀 Como Usar
 
-### Gerar Dashboard Automaticamente
+### Gerar Dashboard Automaticamente (fluxo web)
 
 ```bash
 python3 -m src.main
+# Abre a interface local com stepper:
+#  - Passo 1: fonte input/ ou upload drag-and-drop (PDF/ZIP)
+#  - Passo 2: dashboard existente após processamento
+```
+
+### Modo CLI legado
+
+```bash
+python3 -m src.main --cli
 # Outputs:
 #  - output/informes_rendimentos.xlsx
 #  - output/dashboard.html
