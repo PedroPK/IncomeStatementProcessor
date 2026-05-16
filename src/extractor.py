@@ -5,6 +5,25 @@ import tempfile
 from pathlib import Path
 
 
+def _is_metadata_entry(raw_name: str, safe_name: str, is_dir: bool) -> bool:
+    """Return True for ZIP artifacts that should not be extracted."""
+    if is_dir:
+        return True
+
+    parts = [part for part in raw_name.replace('\\', '/').split('/') if part]
+    if '__MACOSX' in parts:
+        return True
+
+    if safe_name in {'.DS_Store', 'Thumbs.db'}:
+        return True
+
+    # macOS AppleDouble sidecar/resource-fork files
+    if safe_name.startswith('._'):
+        return True
+
+    return False
+
+
 def _safe_name(raw: str) -> str:
     """Normalise a ZIP entry filename to a safe filesystem path."""
     # Some ZIPs use CP437; try to decode properly
@@ -29,6 +48,8 @@ def extract_zip(zip_path: str) -> dict[str, str]:
         for info in zf.infolist():
             safe = _safe_name(info.filename)
             if not safe:
+                continue
+            if _is_metadata_entry(info.filename, safe, info.is_dir()):
                 continue
             dest = os.path.join(tmpdir, safe)
             data = zf.read(info.filename)

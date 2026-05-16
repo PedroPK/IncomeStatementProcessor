@@ -12,9 +12,13 @@ import logging
 import os
 import sys
 import tempfile
+import threading
+import time
+import uuid
 import webbrowser
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Callable
 
 # Suppress noisy pdfminer font warnings
 logging.getLogger("pdfminer").setLevel(logging.ERROR)
@@ -37,6 +41,116 @@ from src.xlsx_writer import write_xlsx
 # ── Supported file extensions ─────────────────────────────────────────────────
 _PDF_EXTENSIONS = {'.pdf', '.aspx', '.asp'}   # ASPX is served as PDF by some portals
 _XLSX_EXTENSIONS = {'.xlsx', '.xls'}
+
+
+_JOBS_LOCK = threading.Lock()
+_JOBS: dict[str, dict[str, Any]] = {}
+
+
+def _is_ignored_artifact(filename: str) -> bool:
+    """Return True for metadata/resource files that should never be processed."""
+    name = Path(filename).name
+    if name in {'.DS_Store', 'Thumbs.db'}:
+        return True
+    if name.startswith('._'):
+        return True
+    return False
+
+
+def _format_duration(seconds: float | None) -> str:
+    """Format seconds as HH:MM:SS (or MM:SS for short durations)."""
+    if seconds is None:
+        return '--:--'
+    total_seconds = max(int(seconds), 0)
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, secs = divmod(remainder, 60)
+    if hours:
+        return f'{hours:02d}:{minutes:02d}:{secs:02d}'
+    return f'{minutes:02d}:{secs:02d}'
+
+
+def _create_job() -> str:
+    """Create a new processing job and return its ID."""
+    job_id = uuid.uuid4().hex
+    with _JOBS_LOCK:
+        _JOBS[job_id] = {
+            'job_id': job_id,
+            'state': 'queued',
+            'stage': 'Aguardando execução',
+            'current_file': '',
+            'processed_steps': 0,
+            'total_steps': 0,
+            'percent': 0.0,
+            'elapsed_seconds': 0.0,
+            'eta_seconds': None,
+            'started_at_monotonic': None,
+            'updated_at': datetime.now().strftime('%d/%m/%Y %H:%M:%S'),
+            'terminal_last_line': 'Aguardando execução.',
+            'result': None,
+            'error': None,
+        }
+    return job_id
+
+
+def _read_job(job_id: str) -> dict[str, Any] | None:
+    """Safely return a shallow copy of job state."""
+    with _JOBS_LOCK:
+        job = _JOBS.get(job_id)
+        return dict(job) if job else None
+
+
+def _update_job(job_id: str, **updates: Any) -> None:
+    """Patch job state with the provided fields."""
+    with _JOBS_LOCK:
+        job = _JOBS.get(job_id)
+        if not job:
+            return
+        job.update(updates)
+        job['updated_at'] = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+
+
+def _build_progress_callback(job_id: str) -> Callable[[dict[str, Any]], None]:
+    """Create a callback that updates both terminal and shared job state."""
+    start_ts = time.monotonic()
+
+    def _callback(event: dict[str, Any]) -> None:
+        processed = int(event.get('processed_steps', 0) or 0)
+        total = int(event.get('total_steps', 0) or 0)
+        stage = str(event.get('stage', 'Processando'))
+        current_file = str(event.get('current_file', ''))
+
+        elapsed = max(time.monotonic() - start_ts, 0.0)
+        percent = (processed / total * 100.0) if total > 0 else 0.0
+        eta = None
+        if processed > 0 and total > processed:
+            remaining_steps = total - processed
+            eta = (elapsed / processed) * remaining_steps
+
+        filename_info = f' | arquivo: {current_file}' if current_file else ''
+        line = (
+            f'[progresso] {processed}/{total} ({percent:5.1f}%)'
+            f' | etapa: {stage}'
+            f'{filename_info}'
+            f' | decorrido: {_format_duration(elapsed)}'
+            f' | ETA: {_format_duration(eta)}'
+        )
+        print(line)
+
+        _update_job(
+            job_id,
+            state='running',
+            stage=stage,
+            current_file=current_file,
+            processed_steps=processed,
+            total_steps=total,
+            percent=percent,
+            elapsed_seconds=elapsed,
+            eta_seconds=eta,
+            started_at_monotonic=start_ts,
+            terminal_last_line=line,
+        )
+
+    return _callback
 
 
 def load_config(path: str = 'config.toml') -> dict:
@@ -128,6 +242,8 @@ def _collect_upload_file_map(uploaded_paths: list[Path]) -> tuple[dict[str, str]
 
     for uploaded_path in uploaded_paths:
         suffix = uploaded_path.suffix.lower()
+        if _is_ignored_artifact(uploaded_path.name):
+            continue
         if suffix == '.zip':
             extracted = extract_zip(str(uploaded_path))
             _merge_file_maps(file_map, extracted)
@@ -139,23 +255,57 @@ def _collect_upload_file_map(uploaded_paths: list[Path]) -> tuple[dict[str, str]
     return file_map, temp_dirs
 
 
-def _parse_file_map(file_map: dict[str, str]) -> tuple[list, list[str]]:
+def _parse_file_map(
+    file_map: dict[str, str],
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
+) -> tuple[list, list[str], int, int]:
     """Parse PDFs/XLSX from an extracted file map and return entries/errors."""
     all_entries = []
     errors: list[str] = []
+    pdf_files = [
+        name for name in sorted(file_map)
+        if Path(name).suffix.lower() in _PDF_EXTENSIONS and not _is_ignored_artifact(name)
+    ]
+    xlsx_files = [
+        name for name in sorted(file_map)
+        if Path(name).suffix.lower() in _XLSX_EXTENSIONS and not _is_ignored_artifact(name)
+    ]
+
+    processed = 0
+    total = len(pdf_files) + len(xlsx_files)
+
+    def notify(stage: str, current_file: str = '') -> None:
+        if progress_callback is None:
+            return
+        progress_callback({
+            'stage': stage,
+            'current_file': current_file,
+            'processed_steps': processed,
+            'total_steps': total,
+        })
+
+    notify('Iniciando leitura dos arquivos')
 
     # Parse PDF files
-    for filename, filepath in sorted(file_map.items()):
-        ext = Path(filename).suffix.lower()
-        if ext not in _PDF_EXTENSIONS:
-            continue
+    for filename in pdf_files:
+        filepath = file_map[filename]
 
         print(f'  Processando: {filename}')
-        entries = parse_file(filepath)
+        notify('Processando arquivo PDF', filename)
+        try:
+            entries = parse_file(filepath)
+        except Exception as exc:  # noqa: BLE001
+            print(f'    [erro] Erro ao processar {filename}: {exc}')
+            errors.append(filename)
+            processed += 1
+            notify('Arquivo PDF concluído com erro', filename)
+            continue
 
         if not entries:
             print(f'    [aviso] Nenhuma entrada extraída de {filename}')
             errors.append(filename)
+            processed += 1
+            notify('Arquivo PDF concluído sem dados', filename)
             continue
 
         err_entries = [e for e in entries if e.secao in ('Erro', 'Desconhecido')]
@@ -168,13 +318,15 @@ def _parse_file_map(file_map: dict[str, str]) -> tuple[list, list[str]]:
 
         print(f'    -> {len(ok_entries)} entradas extraídas.')
         all_entries.extend(ok_entries)
+        processed += 1
+        notify('Arquivo PDF concluído', filename)
 
     # Parse custody XLSX files
-    xlsx_files = [f for f in file_map if Path(f).suffix.lower() in _XLSX_EXTENSIONS]
     if xlsx_files:
-        for xlsx_filename in xlsx_files:
+        for xlsx_filename in sorted(xlsx_files):
             ref_year = _detect_custody_year(xlsx_filename)
             print(f'  Processando custódia: {xlsx_filename} (ano de referência: {ref_year})')
+            notify('Processando arquivo XLSX de custódia', xlsx_filename)
             try:
                 xlsx_entries = parse_custodia_xlsx(
                     file_map[xlsx_filename],
@@ -190,19 +342,59 @@ def _parse_file_map(file_map: dict[str, str]) -> tuple[list, list[str]]:
             except Exception as exc:  # noqa: BLE001
                 print(f'    [erro] Erro ao processar {xlsx_filename}: {exc}')
                 errors.append(xlsx_filename)
+
+            processed += 1
+            notify('Arquivo XLSX concluído', xlsx_filename)
     else:
         print('  [info] Nenhum arquivo XLSX de custódia encontrado.')
 
-    return all_entries, errors
+    return all_entries, errors, processed, total
 
 
-def _run_pipeline(file_map: dict[str, str], config: dict) -> dict:
+def _run_pipeline(
+    file_map: dict[str, str],
+    config: dict,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
+) -> dict:
     """Run parse + outputs generation and return summary metadata."""
     xlsx_path = config.get('output', {}).get('xlsx_path', 'output/informes_rendimentos.xlsx')
     dashboard_path = config.get('output', {}).get('dashboard_path', 'output/dashboard.html')
     gs_config = config.get('google_sheets', {})
+    has_sheets = bool(gs_config.get('enabled', False))
 
-    all_entries, errors = _parse_file_map(file_map)
+    parse_steps_expected = sum(1 for name in file_map if Path(name).suffix.lower() in (_PDF_EXTENSIONS | _XLSX_EXTENSIONS))
+    total_steps = parse_steps_expected + 2 + (1 if has_sheets else 0)
+    steps_done = 0
+
+    def notify(stage: str, current_file: str = '') -> None:
+        if progress_callback is None:
+            return
+        progress_callback({
+            'stage': stage,
+            'current_file': current_file,
+            'processed_steps': steps_done,
+            'total_steps': total_steps,
+        })
+
+    notify('Preparando pipeline')
+
+    def parse_notify(event: dict[str, Any]) -> None:
+        nonlocal steps_done
+        parse_total = int(event.get('total_steps', 0) or 0)
+        parse_processed = int(event.get('processed_steps', 0) or 0)
+        # Keep parse progress aligned with global total (parse + output stages)
+        steps_done = min(parse_processed, parse_total)
+        if progress_callback is None:
+            return
+        progress_callback({
+            'stage': event.get('stage', 'Processando arquivos'),
+            'current_file': event.get('current_file', ''),
+            'processed_steps': steps_done,
+            'total_steps': total_steps,
+        })
+
+    all_entries, errors, parse_processed, parse_total = _parse_file_map(file_map, parse_notify)
+    steps_done = min(parse_processed, parse_total)
 
     print(f'\nTotal: {len(all_entries)} entradas processadas.')
     if errors:
@@ -212,20 +404,29 @@ def _run_pipeline(file_map: dict[str, str], config: dict) -> dict:
         raise RuntimeError('Nenhuma entrada válida. Encerrando sem gerar planilha.')
 
     print('\nGerando planilha XLSX...')
+    notify('Gerando planilha XLSX')
     write_xlsx(all_entries, xlsx_path)
+    steps_done += 1
+    notify('Planilha XLSX concluída')
 
     print('Gerando dashboard HTML...')
     from src.dashboard_generator import generate_dashboard_html
 
     dashboard_dir = Path(dashboard_path).parent
     dashboard_dir.mkdir(parents=True, exist_ok=True)
+    notify('Gerando dashboard HTML')
     generate_dashboard_html(all_entries, dashboard_path)
+    steps_done += 1
+    notify('Dashboard HTML concluído')
 
-    if gs_config.get('enabled', False):
+    if has_sheets:
         print('\nEnviando para Google Sheets...')
         from src.sheets_writer import push_to_sheets
 
+        notify('Enviando para Google Sheets')
         push_to_sheets(all_entries, gs_config)
+        steps_done += 1
+        notify('Google Sheets concluído')
 
     return {
         'entries': len(all_entries),
@@ -426,6 +627,60 @@ def _stepper_html() -> str:
             font-size: 0.92rem;
         }
 
+        .progress-panel {
+            margin-top: 14px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px;
+            background: #f8faff;
+            display: none;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            color: var(--muted);
+        }
+
+        .progress-track {
+            width: 100%;
+            height: 12px;
+            background: #e9eefc;
+            border-radius: 999px;
+            overflow: hidden;
+            border: 1px solid #d8e1fb;
+        }
+
+        .progress-fill {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #4f46e5, #0ea5e9);
+            transition: width 0.25s ease;
+        }
+
+        .progress-meta {
+            margin-top: 8px;
+            font-size: 0.88rem;
+            color: var(--muted);
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 6px;
+        }
+
+        .progress-meta strong {
+            color: var(--text);
+        }
+
+        .progress-file {
+            margin-top: 8px;
+            font-size: 0.9rem;
+            color: #334155;
+            word-break: break-word;
+        }
+
         #step2 {
             display: none;
             margin-top: 14px;
@@ -457,6 +712,7 @@ def _stepper_html() -> str:
         @media (max-width: 768px) {
             .stepper { flex-direction: column; }
             iframe { min-height: 70vh; }
+            .progress-meta { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -519,6 +775,23 @@ def _stepper_html() -> str:
                 <span class="status" id="statusText">Aguardando ação.</span>
             </div>
 
+            <div class="progress-panel" id="progressPanel">
+                <div class="progress-header">
+                    <span id="progressStage">Aguardando...</span>
+                    <strong id="progressPercent">0.0%</strong>
+                </div>
+                <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-meta">
+                    <div>Concluídos: <strong id="progressCount">0/0</strong></div>
+                    <div>Decorrido: <strong id="elapsedText">00:00</strong></div>
+                    <div>ETA: <strong id="etaText">--:--</strong></div>
+                    <div>Atualização: <strong id="updatedText">--</strong></div>
+                </div>
+                <div class="progress-file" id="currentFileText">Arquivo atual: -</div>
+            </div>
+
             <div id="resultBox" class="result" style="display:none;"></div>
         </div>
 
@@ -529,6 +802,7 @@ def _stepper_html() -> str:
 
     <script>
         let selectedFiles = [];
+        let progressTimer = null;
 
         const sourceRadios = document.querySelectorAll('input[name="source"]');
         const dropzone = document.getElementById('dropzone');
@@ -541,6 +815,15 @@ def _stepper_html() -> str:
         const dashboardFrame = document.getElementById('dashboardFrame');
         const stepIndicator1 = document.getElementById('stepIndicator1');
         const stepIndicator2 = document.getElementById('stepIndicator2');
+        const progressPanel = document.getElementById('progressPanel');
+        const progressStage = document.getElementById('progressStage');
+        const progressPercent = document.getElementById('progressPercent');
+        const progressFill = document.getElementById('progressFill');
+        const progressCount = document.getElementById('progressCount');
+        const elapsedText = document.getElementById('elapsedText');
+        const etaText = document.getElementById('etaText');
+        const updatedText = document.getElementById('updatedText');
+        const currentFileText = document.getElementById('currentFileText');
 
         function currentSource() {
             return document.querySelector('input[name="source"]:checked').value;
@@ -611,6 +894,94 @@ def _stepper_html() -> str:
             step2.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
+        function formatDuration(seconds) {
+            if (seconds === null || seconds === undefined) {
+                return '--:--';
+            }
+            const total = Math.max(0, Math.floor(Number(seconds)));
+            const hours = Math.floor(total / 3600);
+            const minutes = Math.floor((total % 3600) / 60);
+            const secs = total % 60;
+            if (hours > 0) {
+                return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            }
+            return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+
+        function updateProgressPanel(payload) {
+            progressPanel.style.display = 'block';
+
+            const pct = Number(payload.percent || 0);
+            const safePct = Math.max(0, Math.min(100, pct));
+            progressStage.textContent = payload.stage || 'Processando...';
+            progressPercent.textContent = `${safePct.toFixed(1)}%`;
+            progressFill.style.width = `${safePct.toFixed(2)}%`;
+            progressCount.textContent = `${payload.processed_steps || 0}/${payload.total_steps || 0}`;
+            elapsedText.textContent = formatDuration(payload.elapsed_seconds);
+            etaText.textContent = formatDuration(payload.eta_seconds);
+            updatedText.textContent = payload.updated_at || '--';
+            currentFileText.textContent = `Arquivo atual: ${payload.current_file || '-'}`;
+        }
+
+        function stopProgressPolling() {
+            if (progressTimer) {
+                clearInterval(progressTimer);
+                progressTimer = null;
+            }
+        }
+
+        function startProgressPolling(jobId) {
+            stopProgressPolling();
+
+            const poll = async () => {
+                const response = await fetch(`/api/progress/${jobId}`);
+                const payload = await response.json();
+                if (!response.ok || !payload.ok) {
+                    throw new Error(payload.error || 'Falha ao consultar progresso.');
+                }
+
+                updateProgressPanel(payload);
+
+                if (payload.state === 'done') {
+                    stopProgressPolling();
+                    const result = payload.result || {};
+                    const warning = result.errors && result.errors.length
+                        ? ` Arquivos com aviso: ${result.errors.join(', ')}.`
+                        : '';
+                    setResult(
+                        `Concluído com ${result.entries} entradas. XLSX: ${result.xlsx_path}. Dashboard: ${result.dashboard_path}.${warning}`
+                    );
+                    statusText.textContent = 'Processamento concluído.';
+                    goToStep2(result.dashboard_url);
+                    processBtn.disabled = false;
+                    return;
+                }
+
+                if (payload.state === 'error') {
+                    stopProgressPolling();
+                    throw new Error(payload.error || 'Falha no processamento.');
+                }
+            };
+
+            poll().catch((error) => {
+                stopProgressPolling();
+                const message = error instanceof Error ? error.message : String(error);
+                setResult(message, true);
+                statusText.textContent = 'Falha no processamento.';
+                processBtn.disabled = false;
+            });
+
+            progressTimer = setInterval(() => {
+                poll().catch((error) => {
+                    stopProgressPolling();
+                    const message = error instanceof Error ? error.message : String(error);
+                    setResult(message, true);
+                    statusText.textContent = 'Falha no processamento.';
+                    processBtn.disabled = false;
+                });
+            }, 1000);
+        }
+
         processBtn.addEventListener('click', async () => {
             const source = currentSource();
             if (source === 'upload' && !selectedFiles.length) {
@@ -621,6 +992,14 @@ def _stepper_html() -> str:
             processBtn.disabled = true;
             statusText.textContent = 'Processando arquivos...';
             setResult('Execução iniciada. Aguarde o processamento terminar.');
+            progressPanel.style.display = 'block';
+            progressStage.textContent = 'Iniciando processamento...';
+            progressPercent.textContent = '0.0%';
+            progressFill.style.width = '0%';
+            progressCount.textContent = '0/0';
+            elapsedText.textContent = '00:00';
+            etaText.textContent = '--:--';
+            currentFileText.textContent = 'Arquivo atual: -';
 
             try {
                 const formData = new FormData();
@@ -636,20 +1015,16 @@ def _stepper_html() -> str:
                 if (!response.ok || !payload.ok) {
                     throw new Error(payload.error || 'Falha no processamento.');
                 }
+                if (!payload.job_id) {
+                    throw new Error('Job de processamento não retornado pelo servidor.');
+                }
 
-                const warning = payload.errors && payload.errors.length
-                    ? ` Arquivos com aviso: ${payload.errors.join(', ')}.`
-                    : '';
-                setResult(
-                    `Concluído com ${payload.entries} entradas. XLSX: ${payload.xlsx_path}. Dashboard: ${payload.dashboard_path}.${warning}`
-                );
-                statusText.textContent = 'Processamento concluído.';
-                goToStep2(payload.dashboard_url);
+                startProgressPolling(payload.job_id);
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
                 setResult(message, true);
                 statusText.textContent = 'Falha no processamento.';
-            } finally {
+                stopProgressPolling();
                 processBtn.disabled = false;
             }
         });
@@ -673,7 +1048,8 @@ def _run_cli_mode(config: dict) -> None:
     file_map = extract_zip(zip_path)
     print(f'  {len(file_map)} arquivo(s) extraído(s).')
 
-    _run_pipeline(file_map, config)
+    cli_progress = _build_progress_callback('cli')
+    _run_pipeline(file_map, config, cli_progress)
     print('\nConcluído!')
 
 
@@ -700,55 +1076,139 @@ def _run_web_mode(config: dict) -> None:
     def serve_output(filename: str):
         return send_from_directory(output_dir, filename)
 
-    @app.post('/api/process')
-    def process():
-        source = (request.form.get('source') or 'input').strip().lower()
+    @app.get('/api/progress/<job_id>')
+    def progress(job_id: str):
+        job = _read_job(job_id)
+        if not job:
+            return jsonify({'ok': False, 'error': 'Job não encontrado.'}), 404
+
+        return jsonify({
+            'ok': True,
+            'job_id': job['job_id'],
+            'state': job['state'],
+            'stage': job['stage'],
+            'current_file': job['current_file'],
+            'processed_steps': job['processed_steps'],
+            'total_steps': job['total_steps'],
+            'percent': job['percent'],
+            'elapsed_seconds': job['elapsed_seconds'],
+            'eta_seconds': job['eta_seconds'],
+            'terminal_last_line': job['terminal_last_line'],
+            'updated_at': job['updated_at'],
+            'result': job['result'],
+            'error': job['error'],
+        })
+
+    def _run_pipeline_worker(job_id: str, source: str, uploads_data: list[tuple[str, bytes]] | None = None) -> None:
+        callback = _build_progress_callback(job_id)
 
         try:
             if source == 'input':
                 zip_path = find_zip('input')
                 if not zip_path:
-                    return jsonify({'ok': False, 'error': 'Nenhum ZIP encontrado em input/.'}), 400
+                    raise RuntimeError('Nenhum ZIP encontrado em input/.')
+
                 print(f'ZIP encontrado: {zip_path}')
                 print('Extraindo arquivos...')
                 file_map = extract_zip(zip_path)
                 print(f'  {len(file_map)} arquivo(s) extraído(s).')
+
+                callback({
+                    'stage': 'Arquivos extraídos do ZIP',
+                    'current_file': Path(zip_path).name,
+                    'processed_steps': 0,
+                    'total_steps': max(len(file_map), 1),
+                })
+
+                result = _run_pipeline(file_map, config, callback)
             elif source == 'upload':
-                uploads = request.files.getlist('files')
-                if not uploads:
-                    return jsonify({'ok': False, 'error': 'Nenhum arquivo enviado.'}), 400
+                if not uploads_data:
+                    raise RuntimeError('Nenhum arquivo enviado.')
 
                 with tempfile.TemporaryDirectory(prefix='irpf_upload_') as tmpdir:
                     uploaded_paths: list[Path] = []
-                    for item in uploads:
-                        if not item.filename:
+                    for filename, content in uploads_data:
+                        if not filename:
                             continue
-                        dest = Path(tmpdir) / Path(item.filename).name
-                        item.save(dest)
+                        dest = Path(tmpdir) / Path(filename).name
+                        with open(dest, 'wb') as output_fh:
+                            output_fh.write(content)
                         uploaded_paths.append(dest)
 
                     file_map, _ = _collect_upload_file_map(uploaded_paths)
                     if not file_map:
-                        return jsonify({'ok': False, 'error': 'Nenhum arquivo válido (PDF/ASPX/ZIP/XLSX).'}), 400
+                        raise RuntimeError('Nenhum arquivo válido (PDF/ASPX/ZIP/XLSX).')
 
-                    result = _run_pipeline(file_map, config)
+                    callback({
+                        'stage': 'Arquivos de upload preparados',
+                        'current_file': '',
+                        'processed_steps': 0,
+                        'total_steps': max(len(file_map), 1),
+                    })
+
+                    result = _run_pipeline(file_map, config, callback)
             else:
-                return jsonify({'ok': False, 'error': 'Fonte inválida.'}), 400
-
-            if source == 'input':
-                result = _run_pipeline(file_map, config)
+                raise RuntimeError('Fonte inválida.')
 
             dashboard_url = f'/output/{dashboard_name}?t={int(datetime.now().timestamp())}'
-
-            return jsonify({
-                'ok': True,
-                'entries': result['entries'],
-                'errors': result['errors'],
-                'xlsx_path': result['xlsx_path'],
-                'dashboard_path': result['dashboard_path'],
-                'generated_at': result['generated_at'],
+            result_with_url = {
+                **result,
                 'dashboard_url': dashboard_url,
-            })
+            }
+
+            _update_job(
+                job_id,
+                state='done',
+                stage='Processamento concluído',
+                percent=100.0,
+                result=result_with_url,
+                error=None,
+                terminal_last_line='[progresso] 100.0% | Processamento concluído com sucesso.',
+            )
+        except Exception as exc:  # noqa: BLE001
+            _update_job(
+                job_id,
+                state='error',
+                stage='Falha no processamento',
+                error=str(exc),
+                terminal_last_line=f'[erro] {exc}',
+            )
+
+    @app.post('/api/process')
+    def process():
+        source = (request.form.get('source') or 'input').strip().lower()
+
+        if source not in {'input', 'upload'}:
+            return jsonify({'ok': False, 'error': 'Fonte inválida.'}), 400
+
+        uploads_data: list[tuple[str, bytes]] | None = None
+
+        if source == 'upload':
+            uploads = request.files.getlist('files')
+            if not uploads:
+                return jsonify({'ok': False, 'error': 'Nenhum arquivo enviado.'}), 400
+
+            uploads_data = []
+            for item in uploads:
+                if not item.filename:
+                    continue
+                uploads_data.append((Path(item.filename).name, item.read()))
+
+            if not uploads_data:
+                return jsonify({'ok': False, 'error': 'Nenhum arquivo enviado.'}), 400
+
+        try:
+            job_id = _create_job()
+            _update_job(job_id, state='running', stage='Iniciando processamento')
+
+            worker = threading.Thread(
+                target=_run_pipeline_worker,
+                args=(job_id, source, uploads_data),
+                daemon=True,
+            )
+            worker.start()
+
+            return jsonify({'ok': True, 'job_id': job_id})
         except Exception as exc:  # noqa: BLE001
             return jsonify({'ok': False, 'error': str(exc)}), 500
 
@@ -763,7 +1223,7 @@ def _run_web_mode(config: dict) -> None:
     except Exception:  # noqa: BLE001
         pass
 
-    app.run(host=host, port=port, debug=False)
+    app.run(host=host, port=port, debug=False, threaded=True)
 
 
 def main() -> None:
