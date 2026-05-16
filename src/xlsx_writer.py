@@ -304,6 +304,37 @@ def _write_totais(wb: Workbook, df: pd.DataFrame) -> None:
 
 # ── Tab 4: Para IRPF ─────────────────────────────────────────────────────────
 
+def _renda_fixa_subtype(discriminacao: str) -> str | None:
+    """Deriva um rótulo de exibição para ativos de renda fixa a partir da
+    Discriminação, permitindo separar Tesouro Direto (Prefixado/Selic/IPCA)
+    de CDB/RDB mesmo quando compartilham o mesmo Grupo/Código (04/02).
+
+    Retorna None quando o tipo não é identificável (mantém o codigo_desc original).
+    """
+    d = (discriminacao or '').upper()
+    if 'TESOURO' in d:
+        if 'SELIC' in d:
+            return 'Tesouro Selic'
+        if 'IPCA' in d:
+            return 'Tesouro IPCA+'
+        if 'PREFIXADO' in d:
+            return 'Tesouro Prefixado'
+        return 'Tesouro Direto'
+    if 'CDB' in d:
+        return 'CDB – Certificado de Depósito Bancário'
+    if 'RDB' in d:
+        return 'RDB – Recibo de Depósito Bancário'
+    if 'LCI' in d:
+        return 'LCI – Letra de Crédito Imobiliário'
+    if 'LCA' in d:
+        return 'LCA – Letra de Crédito do Agronegócio'
+    if 'CRI' in d:
+        return 'CRI – Certificado de Recebíveis Imobiliários'
+    if 'CRA' in d:
+        return 'CRA – Certificado de Recebíveis do Agronegócio'
+    return None
+
+
 def _write_para_irpf(wb: Workbook, df: pd.DataFrame) -> None:
     ws = wb.create_sheet('Para IRPF')
 
@@ -344,11 +375,27 @@ def _write_para_irpf(wb: Workbook, df: pd.DataFrame) -> None:
         for secao in sorted(inst_df['Seção'].unique()):
             sec_df = inst_df[inst_df['Seção'] == secao]
 
-            # Aggregate rows that share (Grupo, Código, Código Descrição).
+            # Aggregate rows that share (Grupo, Código, Descrição).
+            # For renda fixa (04/02 e 04/03), use a subtype derived from
+            # Discriminação so that Tesouro Prefixado/Selic/IPCA and CDB
+            # appear as separate lines instead of merged together.
             merged_rows: list[dict] = []
             seen_key: dict[tuple, dict] = {}
             for _, r in sec_df.iterrows():
-                key = (r['Grupo'], r['Código'], r['Código Descrição'])
+                grupo = r['Grupo']
+                codigo = r['Código']
+                codigo_desc = r['Código Descrição']
+                if grupo == '04' and codigo in ('02', '03'):
+                    subtype = _renda_fixa_subtype(r['Discriminação'])
+                    if subtype:
+                        display_desc = subtype
+                    elif codigo == '02':
+                        display_desc = 'Tesouro Direto'
+                    else:
+                        display_desc = codigo_desc
+                else:
+                    display_desc = codigo_desc
+                key = (grupo, codigo, display_desc)
                 if key in seen_key:
                     seen_key[key]['Valor 31/12/2024'] += r['Valor 31/12/2024']
                     seen_key[key]['Valor 31/12/2025'] += r['Valor 31/12/2025']
@@ -356,6 +403,7 @@ def _write_para_irpf(wb: Workbook, df: pd.DataFrame) -> None:
                     seen_key[key]['IRRF'] += r['IRRF']
                 else:
                     row_dict = r.to_dict()
+                    row_dict['Código Descrição'] = display_desc
                     seen_key[key] = row_dict
                     merged_rows.append(row_dict)
 

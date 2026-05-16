@@ -897,6 +897,30 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
             }});
         }}
 
+        // Derive a display label for renda fixa assets from the discriminacao,
+        // so that Tesouro Selic/Prefixado/IPCA+ and CDB/RDB appear as separate
+        // lines in the IRPF tab instead of being merged under the same code.
+        function irpfDisplayLabel(r) {{
+            if (r.grupo === '04' && (r.codigo === '02' || r.codigo === '03')) {{
+                const d = (r.discriminacao || '').toUpperCase();
+                if (d.includes('TESOURO')) {{
+                    if (d.includes('SELIC'))     return 'Tesouro Selic';
+                    if (d.includes('IPCA'))      return 'Tesouro IPCA+';
+                    if (d.includes('PREFIXADO')) return 'Tesouro Prefixado';
+                    return 'Tesouro Direto';
+                }}
+                if (d.includes('CDB')) return 'CDB \u2013 Certificado de Dep\u00f3sito Banc\u00e1rio';
+                if (d.includes('RDB')) return 'RDB \u2013 Recibo de Dep\u00f3sito Banc\u00e1rio';
+                if (d.includes('LCI')) return 'LCI \u2013 Letra de Cr\u00e9dito Imobili\u00e1rio';
+                if (d.includes('LCA')) return 'LCA \u2013 Letra de Cr\u00e9dito do Agroneg\u00f3cio';
+                if (d.includes('CRI')) return 'CRI \u2013 Certificado de Receb\u00edveis Imobili\u00e1rios';
+                if (d.includes('CRA')) return 'CRA \u2013 Certificado de Receb\u00edveis do Agroneg\u00f3cio';
+                // Fallback for code 02: unidentified entries are generic Tesouro Direto
+                if (r.codigo === '02') return 'Tesouro Direto';
+            }}
+            return r.descricao;
+        }}
+
         // Generate IRPF Tables grouped by Instituição (Broker)
         function gerarTabelasIRPF() {{
             const irpfContent = document.getElementById('irpf-content');
@@ -946,12 +970,14 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                 sortedSecoes.forEach(secao => {{
                     const rawRows = instData[secao];
 
-                    // For IRPF purposes always aggregate by (grupo, codigo, descricao).
-                    // Individual discriminacao values are irrelevant at declaration level.
+                    // Aggregate by (grupo, codigo, display_label). For renda fixa
+                    // (04/02 and 04/03) the label is derived from discriminacao so
+                    // Tesouro Selic/Prefixado/IPCA+ and CDB appear as separate lines.
                     const mergedRows = [];
                     const seenKey   = {{}};
                     rawRows.forEach(r => {{
-                        const key = `${{r.grupo || ''}}|${{r.codigo}}|${{r.descricao}}`;
+                        const displayLabel = irpfDisplayLabel(r);
+                        const key = `${{r.grupo || ''}}|${{r.codigo}}|${{displayLabel}}`;
                         if (seenKey[key] !== undefined) {{
                             mergedRows[seenKey[key]].v2024      += r.v2024      || 0;
                             mergedRows[seenKey[key]].v2025      += r.v2025      || 0;
@@ -959,7 +985,9 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                             mergedRows[seenKey[key]].irrf       += r.irrf       || 0;
                         }} else {{
                             seenKey[key] = mergedRows.length;
-                            mergedRows.push(Object.assign({{}}, r));
+                            const merged = Object.assign({{}}, r);
+                            merged.descricao = displayLabel;
+                            mergedRows.push(merged);
                         }}
                     }});
                     const secaoRows = mergedRows;

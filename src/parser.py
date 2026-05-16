@@ -754,55 +754,56 @@ def parse_nubank(filename: str, pages_text: list[str],
         elif grupo == '08':
             tipo_rend = ''  # Crypto: no income
 
-        # Sum data rows
-        val_2024_sum = 0.0
-        val_2025_sum = 0.0
-        rend_sum = 0.0
+        # Collect per-row data: (discriminacao, v24, v25, rend).
+        # Creating one entry per row lets xlsx_writer and the dashboard
+        # separate Tesouro Selic/Prefixado/IPCA+ from CDB within the
+        # same Grupo/Código block using _renda_fixa_subtype.
+        row_data: list[tuple[str, float, float, float]] = []
 
-        # Standard rows (date-anchored)
+        # Standard rows (date-anchored) – capture description from line prefix
         for m in _NUBANK_ROW_RE.finditer(block):
             line_start = block.rfind('\n', 0, m.start()) + 1
             line = block[line_start:block.find('\n', m.start())]
             if 'Total:' in line or '31/12' in line:
                 continue
-            val_2024_sum += parse_brl(m.group(1))
-            val_2025_sum += parse_brl(m.group(2))
-            if m.group(3):
-                rend_sum += parse_brl(m.group(3))
+            raw_desc = re.sub(r'\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}\s*', '',
+                               block[line_start:m.start()])
+            desc = clean(raw_desc) or codigo_desc
+            row_data.append((desc, parse_brl(m.group(1)), parse_brl(m.group(2)),
+                             parse_brl(m.group(3)) if m.group(3) else 0.0))
 
         # Fund rows (CNPJ-anchored)
         for m in _NUBANK_FUND_ROW_RE.finditer(block):
-            val_2024_sum += parse_brl(m.group(2))
-            val_2025_sum += parse_brl(m.group(3))
-            if m.group(4):
-                rend_sum += parse_brl(m.group(4))
+            row_data.append((codigo_desc, parse_brl(m.group(2)), parse_brl(m.group(3)),
+                             parse_brl(m.group(4)) if m.group(4) else 0.0))
 
         # Crypto rows
         if grupo == '08':
-            val_2024_sum = 0.0
-            val_2025_sum = 0.0
-            for m in _NUBANK_CRYPTO_ROW_RE.finditer(block):
-                val_2024_sum += parse_brl(m.group(2))
-                val_2025_sum += parse_brl(m.group(3))
+            row_data = [
+                (m.group(1), parse_brl(m.group(2)), parse_brl(m.group(3)), 0.0)
+                for m in _NUBANK_CRYPTO_ROW_RE.finditer(block)
+            ]
 
-        # Use explicit Total: line for rendimento when available
-        total_m = re.search(r'Total:\s*R\$\s*([\d.]+,\d{2})', block)
-        if total_m:
-            rend_from_total = parse_brl(total_m.group(1))
-            # Only override if the sum and total don't agree (total is authoritative)
-            rend_sum = rend_from_total
+        # Fallback: if no rows matched, check for a Total: line
+        if not row_data:
+            total_m = re.search(r'Total:\s*R\$\s*([\d.]+,\d{2})', block)
+            if total_m:
+                row_data.append((codigo_desc, 0.0, 0.0, parse_brl(total_m.group(1))))
+            else:
+                continue
 
-        if val_2024_sum + val_2025_sum + rend_sum == 0:
-            continue
-
-        entries.append(_entry(
-            filename, inst, cnpj_fonte or inst, ano,
-            'Bens e Direitos', grupo, grupo_desc, codigo, codigo_desc,
-            fonte_pagadora=fonte, cnpj_fonte=cnpj_fonte,
-            localizacao=loc,
-            valor_2024=val_2024_sum, valor_2025=val_2025_sum,
-            rendimento=rend_sum, tipo_rendimento=tipo_rend,
-        ))
+        for desc, v24, v25, rend in row_data:
+            if v24 + v25 + rend == 0:
+                continue
+            entries.append(_entry(
+                filename, inst, cnpj_fonte or inst, ano,
+                'Bens e Direitos', grupo, grupo_desc, codigo, codigo_desc,
+                fonte_pagadora=fonte, cnpj_fonte=cnpj_fonte,
+                localizacao=loc,
+                discriminacao=desc,
+                valor_2024=v24, valor_2025=v25,
+                rendimento=rend, tipo_rendimento=tipo_rend,
+            ))
 
     return entries
 
