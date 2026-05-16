@@ -452,7 +452,7 @@ def _xp_parse_detail_tables(filename, tables, inst, cnpj, ano, cnpj_names):
             }
             codigo_descs = {
                 ('04', '02'): 'Títulos públicos e privados sujeitos à tributação (CDB, RDB, Tesouro)',
-                ('04', '03'): 'Títulos isentos de tributação (LCI, LCA, CRI, CRA)',
+                ('04', '03'): 'Títulos isentos de tributação (LCI, LCA, LCD, CRI, CRA, LIG, Debêntures de Infraestrutura e outros)',
                 ('06', '01'): 'Depósito em conta corrente ou conta pagamento',
                 ('06', '99'): 'Outros depósitos à vista',
                 ('07', '01'): 'Fundos sujeitos à tributação periódica (come-cotas)',

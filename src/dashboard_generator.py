@@ -1105,6 +1105,9 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                 if (d.includes('LCA')) return 'LCA \u2013 Letra de Cr\u00e9dito do Agroneg\u00f3cio';
                 if (d.includes('CRI')) return 'CRI \u2013 Certificado de Receb\u00edveis Imobili\u00e1rios';
                 if (d.includes('CRA')) return 'CRA \u2013 Certificado de Receb\u00edveis do Agroneg\u00f3cio';
+                if (d.includes('LCD')) return 'LCD \u2013 Letra de C\u00e2mbio';
+                if (d.includes('LIG')) return 'LIG \u2013 Letra Imobili\u00e1ria Garantida';
+                if (d.includes('DEBENTURE') || d.includes('DEB\u00caNTURE') || d.startsWith('DEB ')) return 'Deb\u00eantures de Infraestrutura';
                 // Fallback for code 02: unidentified entries are generic Tesouro Direto
                 if (r.codigo === '02') return 'Tesouro Direto';
             }}

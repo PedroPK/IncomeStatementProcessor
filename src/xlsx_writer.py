@@ -332,6 +332,12 @@ def _renda_fixa_subtype(discriminacao: str) -> str | None:
         return 'CRI – Certificado de Recebíveis Imobiliários'
     if 'CRA' in d:
         return 'CRA – Certificado de Recebíveis do Agronegócio'
+    if 'LCD' in d:
+        return 'LCD – Letra de Câmbio'
+    if 'LIG' in d:
+        return 'LIG – Letra Imobiliária Garantida'
+    if 'DEBENTURE' in d or 'DEBÊNTURE' in d or d.startswith('DEB '):
+        return 'Debêntures de Infraestrutura'
     return None
 
 

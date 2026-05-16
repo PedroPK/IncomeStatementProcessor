@@ -247,6 +247,9 @@ Ativos de Renda Fixa com Grupo `04` e Código `02`/`03` são diferenciados por s
 | LCA | LCA – Letra de Crédito do Agronegócio |
 | CRI | CRI – Certificado de Recebíveis Imobiliários |
 | CRA | CRA – Certificado de Recebíveis do Agronegócio |
+| LCD | LCD – Letra de Câmbio |
+| LIG | LIG – Letra Imobiliária Garantida |
+| DEBENTURE / DEBÊNTURE | Debêntures de Infraestrutura |
 
 **Dashboard HTML:**
 - 4 cards de métricas-chave
