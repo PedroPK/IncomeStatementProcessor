@@ -250,17 +250,188 @@ def parse_xp(filename: str, pages_text: list[str],
     primary_inst = 'XP Investimentos'
     primary_cnpj = '02.332.886/0001-04'
 
-    # ── Page 1: Rendimentos summary (Código-level, not Bens e Direitos) ─────
-    p1 = pages_text[0] if pages_text else ''
-    entries += _xp_parse_page1(filename, p1, primary_inst, primary_cnpj, ano, cnpj_names)
+    # Pages 1–2 are consolidated summaries; page 3 notes this explicitly.
+    # All financial data is extracted exclusively from "Detalhamento dos Ativos"
+    # (pages 4+). Contributor identification (nome/CPF) is captured by
+    # extract_taxpayer_info() in parse_file(), so nothing is lost.
 
     # ── Pages 4–6 (index 3–5): Bens e Direitos detailed breakdown ───────────
     detail_tables: list[Any] = []
     for pi in range(3, min(6, len(pages_tables))):
         detail_tables.extend(pages_tables[pi])
 
-    entries += _xp_parse_detail_tables(filename, detail_tables,
-                                       primary_inst, primary_cnpj, ano, cnpj_names)
+    table_entries = _xp_parse_detail_tables(filename, detail_tables,
+                                            primary_inst, primary_cnpj, ano, cnpj_names)
+    entries += table_entries
+
+    # XP PDFs use a 2-column layout on pages 4-5: pdfplumber's extract_tables()
+    # only captures the LEFT column. The RIGHT column (same count of securities)
+    # appears only in the page text. Supplement with any IDs not yet captured.
+    seen_ids: set[str] = set()
+    for e in table_entries:
+        disc = e.discriminacao or ''
+        # "CDB FLU CDB7244L9D5" → extract CDB7244L9D5
+        for m in re.finditer(
+            r'(?:CDB|LCA|LCI|LIG|LCD|CRI|CRA|RDB|DEB)\s+\S+\s+(\S+)', disc, re.IGNORECASE
+        ):
+            seen_ids.add(m.group(1))
+        # single-token IDs like "LCA 24L03394025"
+        for m in re.finditer(
+            r'(?:LCA|LCI|LIG|LCD|CRI|CRA)\s+([A-Z0-9]{8,})', disc, re.IGNORECASE
+        ):
+            seen_ids.add(m.group(1))
+
+    entries += _xp_supplement_text(
+        filename, pages_text, primary_inst, primary_cnpj, ano, cnpj_names, seen_ids
+    )
+
+    return entries
+
+
+def _xp_supplement_text(
+    filename: str,
+    pages_text: list[str],
+    inst: str,
+    cnpj: str,
+    ano: int,
+    cnpj_names: dict,
+    seen_ids: set[str],
+) -> list[Entry]:
+    """
+    XP PDFs render pages 4-5 in a 2-column grid; pdfplumber's table extractor
+    only captures the LEFT column. This function scans the full page TEXT to
+    find securities in the RIGHT column (identified by instrument-ID lines whose
+    code is not yet in seen_ids) and returns the missing Entry objects.
+    """
+    # Combine text of detail pages (pages 4-5, indices 3-4)
+    combined = '\n'.join(pages_text[3:min(5, len(pages_text))])
+    lines = combined.split('\n')
+    entries: list[Entry] = []
+
+    # A "values line" ends with exactly 3 monetary amounts (val_2024, val_2025, rend)
+    _val_re = re.compile(
+        r'^(.+?)\s+([\d.]*\d,\d{2})\s+([\d.]*\d,\d{2})\s+([\d.]*\d,\d{2})\s*$'
+    )
+    # Instrument ID line: starts with an instrument type keyword
+    _instr_re = re.compile(
+        r'^(CDB|LCA|LCI|LIG|LCD|CRI|CRA|RDB|DEB(?:ENTURE|ÊNTURE)?)\s+',
+        re.IGNORECASE,
+    )
+    # Lines that are clearly declaration / ficha metadata — skip as bank-name continuations
+    _meta_markers = (
+        'Declaração', 'IRPF', 'Ficha', 'CNPJ:', 'Grupo ', 'Cód.',
+        'XP INVESTIMENTOS', 'Página ', 'ATENDIMENTO', 'AUTOATENDIMENTO',
+        'OUVIDORIA', 'SAC:', 'AV.', 'DIAS ÚTEIS', 'GERADO EM', 'WWW.XPI',
+        'Total:', 'Saldos em', 'TRIBUTAÇÃO', 'DETALHAMENTO',
+    )
+
+    # Lookup tables (duplicated locally to keep function self-contained)
+    _grupo_descs: dict[str, str] = {
+        '04': 'Aplicações e Investimentos',
+        '06': 'Depósito à Vista e Numerário',
+        '07': 'Fundos',
+    }
+    _codigo_descs: dict[tuple[str, str], str] = {
+        ('04', '02'): 'Títulos públicos e privados sujeitos à tributação (CDB, RDB, Tesouro)',
+        ('04', '03'): 'Títulos isentos de tributação (LCI, LCA, LCD, CRI, CRA, LIG, Debêntures de Infraestrutura e outros)',
+        ('06', '99'): 'Outros depósitos à vista',
+        ('07', '08'): 'Fundos de Índice de Renda Fixa (ETF RF)',
+    }
+
+    # Current section state: (secao, grupo, codigo)
+    # Default = Sujeitos Renda Fixa; will be updated by section headers.
+    section_state = ('Bens e Direitos', '04', '02')
+
+    for li, raw_line in enumerate(lines):
+        stripped = raw_line.strip()
+
+        # ── Update section from headers ───────────────────────────────────────
+        if 'RENDIMENTOS ISENTOS' in stripped:
+            section_state = ('Rendimentos Isentos', '04', '03')
+        elif 'RENDIMENTOS SUJEITOS' in stripped and 'ETF' not in stripped:
+            section_state = ('Bens e Direitos', '04', '02')
+        elif 'ETF de Renda Fixa' in stripped:
+            section_state = ('Bens e Direitos', '07', '08')
+        elif 'SALDO EM CONTA' in stripped:
+            section_state = ('Bens e Direitos', '06', '99')
+
+        # ── Only act on instrument ID lines ──────────────────────────────────
+        if not _instr_re.match(stripped):
+            continue
+
+        tokens = stripped.split()
+        # "CDB FLU ID" → tokens[2]; "LCA ID" → tokens[1]
+        if len(tokens) >= 3:
+            sec_id = tokens[2]
+        elif len(tokens) == 2:
+            sec_id = tokens[1]
+        else:
+            continue
+
+        if sec_id in seen_ids:
+            continue  # Already captured by table parser
+
+        # ── Look backward for the values line (up to 12 lines back) ──────────
+        bank_name: str | None = None
+        val_line_idx: int = -1
+        v24 = v25 = rend = 0.0
+
+        for back in range(1, 13):
+            if li - back < 0:
+                break
+            prev = lines[li - back].strip()
+            vm = _val_re.match(prev)
+            if vm:
+                raw_bank = vm.group(1).strip()
+                # Strip column-header prefix that pdfplumber sometimes prepends
+                raw_bank = re.sub(r'^\s*\(Valores em Reais\)\s*', '', raw_bank).strip()
+                if not raw_bank or raw_bank.lower().startswith('total'):
+                    break  # Hit a totals/header line — no match
+                bank_name = raw_bank
+                val_line_idx = li - back
+                v24 = parse_brl(vm.group(2))
+                v25 = parse_brl(vm.group(3))
+                rend = parse_brl(vm.group(4))
+                break
+
+        if bank_name is None:
+            continue
+
+        # Collect continuation lines between values line and ID line
+        # (e.g., "CREDITO, F" after "FACTA FINANCEIRA S.A.") but skip metadata
+        name_parts = [bank_name]
+        for j in range(val_line_idx + 1, li):
+            cont = lines[j].strip()
+            if not cont:
+                continue
+            if any(marker in cont for marker in _meta_markers):
+                continue
+            if _instr_re.match(cont):
+                break
+            if re.match(r'^\d{2}/\d{2}/\d{4}$', cont):
+                continue
+            name_parts.append(cont)
+
+        discriminacao = clean('\n'.join(name_parts) + '\n' + stripped)
+
+        secao, grupo, codigo = section_state
+        grupo_desc = _grupo_descs.get(grupo, 'Aplicações e Investimentos')
+        codigo_desc = _codigo_descs.get((grupo, codigo), f'Código {codigo}')
+
+        # Use the same resolved institution name as the table parser so that
+        # left-column and right-column entries are grouped under one heading.
+        resolved_inst = cnpj_names.get(cnpj, inst)
+
+        entries.append(_entry(
+            filename, resolved_inst, cnpj, ano,
+            secao, grupo, grupo_desc, codigo, codigo_desc,
+            fonte_pagadora=resolved_inst, cnpj_fonte=cnpj,
+            discriminacao=discriminacao,
+            valor_2024=v24, valor_2025=v25,
+            rendimento=rend,
+            tipo_rendimento='Tributação Exclusiva' if grupo in ('04', '07') else '',
+        ))
+        seen_ids.add(sec_id)
 
     return entries
 
@@ -354,7 +525,10 @@ def _xp_parse_detail_tables(filename, tables, inst, cnpj, ano, cnpj_names):
             tagged.append(('decl', t))
         elif 'Ficha' in first_cell:
             tagged.append(('ficha', t))
-        elif len(t[0]) >= 3:
+        elif len(t[0]) >= 3 and any(any(c for c in row) for row in t):
+            # Only tag as data if at least one row has non-empty cells;
+            # empty placeholder tables (all blank) are treated as 'other' to
+            # avoid corrupting the declaration-assignment algorithm.
             tagged.append(('data', t))
         else:
             tagged.append(('other', t))
@@ -396,10 +570,22 @@ def _xp_parse_detail_tables(filename, tables, inst, cnpj, ano, cnpj_names):
     for i, (tag, t) in enumerate(tagged):
         if tag != 'data':
             continue
-        # Find owning declaration
+        # Find owning declaration.
+        # Pattern in XP PDFs: the declaration row appears IMMEDIATELY after the
+        # FIRST data row of each group (no other data rows between them).
+        # Subsequent data rows of the same group have no declaration after them
+        # until the next group starts — so they must use the PREVIOUS declaration.
+        # Using "next_decl" blindly causes CDB tables on page 5 to be wrongly
+        # assigned to the ETF declaration that follows later on the same page.
         next_decl = next((d for d in decl_positions if d > i), None)
         prev_decl = next((d for d in reversed(decl_positions) if d < i), None)
-        own_decl = next_decl if next_decl is not None else prev_decl
+        if next_decl is not None:
+            # Use next_decl only when this data table is the FIRST of its group,
+            # i.e. no other data tables sit between it and the declaration.
+            data_between = any(tagged[j][0] == 'data' for j in range(i + 1, next_decl))
+            own_decl = prev_decl if data_between else next_decl
+        else:
+            own_decl = prev_decl
         if own_decl is None:
             continue
 

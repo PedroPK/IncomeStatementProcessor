@@ -399,6 +399,11 @@ def _write_para_irpf(wb: Workbook, df: pd.DataFrame) -> None:
                         display_desc = 'Tesouro Direto'
                     else:
                         display_desc = codigo_desc
+                elif grupo == '07' and codigo == '08':
+                    # XP and some brokers place CDBs under 07/08 (ETF RF) in the
+                    # PDF; if the discriminação reveals the true instrument, use it.
+                    subtype = _renda_fixa_subtype(r['Discriminação'])
+                    display_desc = subtype if subtype else codigo_desc
                 else:
                     display_desc = codigo_desc
                 key = (grupo, codigo, display_desc)
