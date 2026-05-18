@@ -544,6 +544,14 @@ def _stepper_html() -> str:
             --border: #dfe5f3;
         }
 
+        html.dark-mode {
+            --bg: #0f1117;
+            --card: #1a1d2e;
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+            --border: #2d3748;
+        }
+
         * { box-sizing: border-box; }
 
         body {
@@ -552,6 +560,10 @@ def _stepper_html() -> str:
             font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
             color: var(--text);
             background: radial-gradient(circle at top right, #e6ecff 0%, var(--bg) 45%, #eff2fb 100%);
+        }
+
+        html.dark-mode body {
+            background: radial-gradient(circle at top right, #1a1d2e 0%, var(--bg) 45%, #151928 100%);
         }
 
         .container {
@@ -607,6 +619,10 @@ def _stepper_html() -> str:
             font-weight: 700;
             color: var(--muted);
             background: #fff;
+        }
+
+        html.dark-mode .step-index {
+            background: var(--card);
         }
 
         .step.active {
@@ -675,10 +691,19 @@ def _stepper_html() -> str:
             transition: all 0.2s;
         }
 
+        html.dark-mode .dropzone {
+            background: #151928;
+            border-color: #3b4d7a;
+        }
+
         .dropzone.active {
             border-color: var(--primary);
             background: #edf2ff;
             color: var(--text);
+        }
+
+        html.dark-mode .dropzone.active {
+            background: #1e2a4a;
         }
 
         .file-list {
@@ -724,6 +749,10 @@ def _stepper_html() -> str:
             display: none;
         }
 
+        html.dark-mode .progress-panel {
+            background: #151928;
+        }
+
         .progress-header {
             display: flex;
             justify-content: space-between;
@@ -740,6 +769,11 @@ def _stepper_html() -> str:
             border-radius: 999px;
             overflow: hidden;
             border: 1px solid #d8e1fb;
+        }
+
+        html.dark-mode .progress-track {
+            background: #1e2a4a;
+            border-color: #2d3748;
         }
 
         .progress-fill {
@@ -769,6 +803,10 @@ def _stepper_html() -> str:
             word-break: break-word;
         }
 
+        html.dark-mode .progress-file {
+            color: var(--muted);
+        }
+
         #step2 {
             display: none;
             margin-top: 14px;
@@ -783,10 +821,20 @@ def _stepper_html() -> str:
             border: 1px solid var(--border);
         }
 
+        html.dark-mode .result {
+            background: #1a1d2e;
+        }
+
         .result.error {
             background: #fff1f1;
             border-color: #f4b4b4;
             color: #7f1d1d;
+        }
+
+        html.dark-mode .result.error {
+            background: #2d1515;
+            border-color: #7f2020;
+            color: #fca5a5;
         }
 
         iframe {
@@ -795,6 +843,10 @@ def _stepper_html() -> str:
             border: 1px solid var(--border);
             border-radius: 12px;
             background: #fff;
+        }
+
+        html.dark-mode iframe {
+            background: var(--card);
         }
 
         @media (max-width: 768px) {
@@ -813,6 +865,9 @@ def _stepper_html() -> str:
             </div>
             <button id="restartBtn" title="Encerrar instância atual e iniciar uma nova" style="flex-shrink:0; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.4); backdrop-filter:blur(4px);">
                 ↺ Nova Sessão
+            </button>
+            <button id="themeBtn" title="Alternar modo escuro/claro" style="flex-shrink:0; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.4); backdrop-filter:blur(4px);">
+                🌙 Escuro
             </button>
         </div>
 
@@ -1123,6 +1178,29 @@ def _stepper_html() -> str:
         });
 
         refreshUploadVisibility();
+
+        // ── Dark / Light mode toggle ──────────────────────────────────────────
+        const themeBtn = document.getElementById('themeBtn');
+        const htmlEl = document.documentElement;
+
+        const savedTheme = localStorage.getItem('stepper-theme');
+        if (savedTheme === 'dark') {
+            htmlEl.classList.add('dark-mode');
+            themeBtn.textContent = '☀️ Claro';
+        }
+
+        themeBtn.addEventListener('click', () => {
+            const isDark = htmlEl.classList.contains('dark-mode');
+            if (isDark) {
+                htmlEl.classList.remove('dark-mode');
+                localStorage.setItem('stepper-theme', 'light');
+                themeBtn.textContent = '🌙 Escuro';
+            } else {
+                htmlEl.classList.add('dark-mode');
+                localStorage.setItem('stepper-theme', 'dark');
+                themeBtn.textContent = '☀️ Claro';
+            }
+        });
 
         // ── Nova Sessão / restart ─────────────────────────────────────────────
         const restartBtn = document.getElementById('restartBtn');
