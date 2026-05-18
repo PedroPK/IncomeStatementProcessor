@@ -212,14 +212,38 @@ def parse_BANCO(filename: str, pages_text: list[str],
 | Parser | Instituição | Quadros Extraídos |
 |---|---|---|
 | `parse_accenture` | Accenture do Brasil | Q3 Tributáveis, Q4 Isentos, Q5 Exclusivos |
-| `parse_clear` | Clear Corretora | Informe + Custódia |
+| `parse_clear` | Clear Corretora | Dispatcher: roteia para `parse_xp` (Informe) ou `_parse_clear_custodia` (Custódia) |
 | `parse_inter` | Banco Inter | Q3 Tributáveis, Q4 Isentos |
 | `parse_nubank` | NuBank | Q3 Tributáveis, Q4 Isentos |
-| `parse_xp` | XP Investimentos | Q3 Tributáveis, Q4 Isentos, Bens e Direitos |
+| `parse_xp` | XP Investimentos | Q3 Tributáveis, Q4 Isentos, Bens e Direitos, Saldo em Conta (06/99) |
 | `parse_xp_previdencia` | XP Previdência | Q3 Tributáveis, Q4 Isentos, Q5 Exclusivos |
 | `parse_avenue` | Avenue Securities | Q3 Tributáveis, Bens e Direitos (exterior) |
 | `parse_fachesf` | FACHESF | Q3 Tributáveis, Q4 Isentos, Q5 Exclusivos |
 | `parse_inss` | INSS / FRGPS | Q3 Tributáveis, Q4 Isentos |
+
+**Dispatcher Clear (`parse_clear`):**
+
+A Clear emite dois tipos de documentos com nomes de arquivo semelhantes. O roteamento é feito verificando **somente a página 1** do PDF:
+
+```python
+page1_text = pages_text[0] if pages_text else ''
+if 'INFORME DE RENDIMENTOS' in page1_text.upper():
+    entries = parse_xp(filename, pages_text, pages_tables)   # Informe
+else:
+    entries = _parse_clear_custodia(filename, pages_text, pages_tables)  # Custódia
+```
+
+> ⚠️ A página 2 do Informe contém a frase *"com posição em custódia"* em notas explicativas. Verificar `full_text` causaria falso positivo e roteamento incorreto para `_parse_clear_custodia`.
+
+**Extração de Saldo em Conta (`parse_xp` + Clear):**
+
+O campo "Saldo em Conta" (Bens e Direitos, Grupo 06 / Código 99) é extraído por `parse_xp` usando as primeiras 3 páginas do PDF. A página 1 exibe os valores num formato fragmentado; a **página 3** ("DETALHAMENTO DOS ATIVOS") apresenta o dado em linha única limpa:
+
+```
+Saldo em conta - XP Investimentos CCTVM S/A  820,31  7.745,95
+```
+
+A extração usa `_xp_summary_rows()` e `_detect_cnpj_in_block()`. O parser `_parse_clear_custodia` **não** extrai saldo (apenas teria o valor de 2025, gerando duplicata incompleta).
 
 ---
 
@@ -263,8 +287,16 @@ Ativos de Renda Fixa com Grupo `04` e Código `02`/`03` são diferenciados por s
 - **Coluna Discriminação**: visível na tabela para facilitar filtragem de ativos específicos
 - **Linha de subtotal** (`<tfoot>`): exibe soma de 2024, 2025 e Rendimento das linhas visíveis (atualizada dinamicamente com os filtros)
 
-**Aba Para IRPF:**
-- Agregação por `(Grupo, Código, rótulo_derivado)` — para renda fixa, o rótulo vem de `irpfDisplayLabel()` (dashboard) / `_renda_fixa_subtype()` (XLSX), separando Tesouro Selic/Prefixado/IPCA+ e CDB em linhas distintas
+**Aba Para IRPF – Chave de Agregação:**
+
+| Seção | Chave (Dashboard JS) | Chave (XLSX Python) |
+|---|---|---|
+| Bens e Direitos | `grupo\|codigo\|discriminacao` | `(grupo, codigo, display_desc, discriminacao)` |
+| Rendimentos / outros | `grupo\|codigo\|displayLabel` | `(grupo, codigo, display_desc)` |
+
+- **Bens e Direitos**: cada ativo é uma linha separada (ex.: FIIs individuais da Clear não são colapsados).
+- **Rendimentos**: consolidados por tipo dentro de cada instituição.
+- Para renda fixa (04/02 e 04/03), o `displayLabel` / `display_desc` é derivado de `discriminacao` via `irpfDisplayLabel()` (JS) / `_renda_fixa_subtype()` (Python), separando Tesouro Selic/Prefixado/IPCA+ e CDB em linhas distintas.
 
 ---
 

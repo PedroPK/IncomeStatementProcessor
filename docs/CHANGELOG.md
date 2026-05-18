@@ -5,6 +5,48 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere a [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.6.0] - 2026-05-18
+
+### 🐛 Corrigido
+
+#### Parser Clear – Roteamento incorreto do Informe de Rendimentos
+- **`parse_clear()` em `src/parser.py`**: A detecção do tipo de documento Clear usava `full_text.lower()` para procurar `"custódia"`. A página 2 do Informe de Rendimentos contém a frase *"com posição em custódia"* em notas explicativas, fazendo o informe ser roteado erroneamente para `_parse_clear_custodia` e não gerar nenhuma entrada.
+  - **Fix**: Verificação de roteamento passou a usar exclusivamente o texto da **página 1** (`pages_text[0]`) com busca positiva por `'INFORME DE RENDIMENTOS'`.
+  - Informe → `parse_xp` | Custódia → `_parse_clear_custodia`
+
+#### Aba "Para IRPF" – Ativos Clear mesclados em linha única
+- **`gerarTabelasIRPF()` em `src/dashboard_generator.py`** e **`_write_para_irpf()` em `src/xlsx_writer.py`**: A chave de mesclagem usava apenas `(grupo, codigo, descricao)` para a seção "Bens e Direitos", colapsando múltiplos ativos de mesmo tipo (ex.: várias FIIs diferentes) numa única linha somada.
+  - **Fix**: Para "Bens e Direitos", a chave de mesclagem agora inclui `discriminacao`, mantendo cada ativo como linha separada:
+    - **Dashboard JS**: `\`${r.grupo}|${r.codigo}|${r.discriminacao || displayLabel}\``
+    - **XLSX Python**: `key = (grupo, codigo, display_desc, r['Discriminação'] or '')`
+  - Seções de Rendimentos continuam usando a chave antiga `(grupo, codigo, descricao)` para consolidação por tipo.
+
+#### Parser Clear – Entrada duplicada de Saldo em Conta
+- **`_parse_clear_custodia()` em `src/parser.py`**: O parser de custódia também gerava uma entrada para "Saldo em Conta" (Grupo 06 / Código 99), mas só tinha o valor de 2025 (valor_2024 = R$ 0,00), criando uma entrada duplicada e incompleta ao lado da já extraída pelo Informe.
+  - **Fix**: Bloco de extração de saldo removido de `_parse_clear_custodia`. A extração canônica (com ambos os valores 2024 e 2025) fica em `parse_xp`.
+
+### ✨ Adicionado
+
+#### Parser Clear – Extração de Saldo em Conta (Bens e Direitos – 06/99)
+- **`parse_xp()` em `src/parser.py`**: Adicionado bloco de extração de **Saldo em Conta** imediatamente antes do `return entries`, usando as primeiras 3 páginas do PDF (`pages_text[:min(3, len(pages_text))]`).
+  - A página 1 do Informe Clear exibe "Saldo em conta" num formato fragmentado; a **página 3** ("DETALHAMENTO DOS ATIVOS") traz o dado numa linha limpa: `"Saldo em conta - XP Investimentos CCTVM S/A  820,31  7.745,95"`.
+  - Extração usa `_xp_summary_rows()` para capturar `(desc, v2024, v2025)` e `_detect_cnpj_in_block()` para associar o CNPJ correto.
+  - Gera entry com: `secao='Bens e Direitos'`, `grupo='06'`, `codigo='99'`, `codigo_desc='Outros depósitos à vista'`, com os valores de 31/12/2024 e 31/12/2025 preenchidos.
+  - Pipeline validado: 1 entrada de saldo por informe Clear (ex.: v24=820,31 | v25=7.745,95).
+
+### 🔧 Melhorado
+
+#### Higiene de Repositório – `.gitignore` e scripts
+- **`.gitignore`** atualizado com entradas que faltavam:
+  - `temp_extracted/` — pasta criada por alguns scripts de extração de depuração
+  - `*.log` — arquivos de log gerados por redirecionamento de shell (`> output.log`)
+  - `.pytest_cache/` — cache do pytest
+  - `.venv-1/` — segundo ambiente virtual criado acidentalmente
+  - `/debug_*.py` — scripts de depuração temporários na raiz do projeto
+- **`scripts/debug_clear.py`**: script de depuração movido da raiz do projeto para `scripts/` (pasta já listada no `.gitignore`).
+
+---
+
 ## [1.5.0] - 2026-05-17
 
 ### ✨ Adicionado

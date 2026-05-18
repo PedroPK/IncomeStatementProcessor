@@ -285,6 +285,31 @@ def parse_xp(filename: str, pages_text: list[str],
         filename, pages_text, primary_inst, primary_cnpj, ano, cnpj_names, seen_ids
     )
 
+    # ── SALDO EM CONTA (Bens e Direitos – Grupo 06 / Código 99) ─────────────
+    # This section appears on the summary page (page 1) AND on the detail page
+    # (page 3 for 3-page Clear informes).  The detail page has the cleanest
+    # format: "Saldo em conta - Institution  v24  v25" on a single line.
+    # Extend search to pages[:3] to capture both Clear (3-page) and XP formats.
+    summary_text = '\n'.join(pages_text[:min(3, len(pages_text))])
+    saldo_idx = summary_text.upper().find('SALDO EM CONTA')
+    if saldo_idx >= 0:
+        saldo_block = summary_text[saldo_idx:]
+        for row in _xp_summary_rows(saldo_block):
+            desc, v24, v25, _rend = row
+            if not desc or v24 + v25 == 0:
+                continue
+            f_cnpj = _detect_cnpj_in_block(saldo_block, cnpj_names) or primary_cnpj
+            f_inst = cnpj_names.get(f_cnpj, primary_inst)
+            entries.append(_entry(
+                filename, f_inst, primary_cnpj, ano,
+                'Bens e Direitos', '06', 'Depósito à Vista e Numerário', '99',
+                'Outros depósitos à vista',
+                fonte_pagadora=f_inst, cnpj_fonte=f_cnpj,
+                discriminacao=desc,
+                valor_2024=v24, valor_2025=v25,
+                rendimento=0.0,
+            ))
+
     return entries
 
 
@@ -761,16 +786,18 @@ def parse_clear(filename: str, pages_text: list[str],
     2. "Custódia" - detailed asset position with holdings breakdown
     """
     from dataclasses import replace
-    
-    full_text = '\n'.join(pages_text).lower()
-    
-    # Detect document type
-    if 'custódia' in full_text or 'custod' in full_text:
-        # Parse custody/assets document
-        entries = _parse_clear_custodia(filename, pages_text, pages_tables)
-    else:
+
+    # Detect document type by looking at page 1 only.
+    # Use a positive match for "INFORME DE RENDIMENTOS" so that mentions of
+    # "custódia" that appear in footnotes/informational text on the informe
+    # (e.g. "...com posição em custódia...") do not mis-route the file.
+    page1_text = pages_text[0] if pages_text else ''
+    if 'INFORME DE RENDIMENTOS' in page1_text.upper():
         # Use the same parsing logic as XP since Clear uses the standard format
         entries = parse_xp(filename, pages_text, pages_tables)
+    else:
+        # Parse custody/assets document
+        entries = _parse_clear_custodia(filename, pages_text, pages_tables)
     
     # Update institution name to "Clear" while preserving other parsed data
     entries = [replace(e, instituicao='Clear') for e in entries]
@@ -855,26 +882,10 @@ def _parse_clear_custodia(filename: str, pages_text: list[str],
                     rendimento=0.0,
                 ))
     
-    # ── Parse saldo disponível (cash) ──────────────────────────────────────
-    # Look for "Saldo em Conta", "Disponível", etc. patterns
-    saldo_pattern = r'(?:Saldo|Disponível|Em\s+Conta)[^\n]*?R\$\s*([\d.]+,\d{2})'
-    for m in re.finditer(saldo_pattern, full_text, re.IGNORECASE):
-        saldo_value = parse_brl(m.group(1))
-        if saldo_value > 0:
-            entries.append(_entry(
-                filename, inst, primary_cnpj, ano,
-                'Bens e Direitos', '06', _grupo_desc('06'), '01',
-                'Depósito em conta corrente ou conta pagamento',
-                fonte_pagadora=inst,
-                cnpj_fonte=primary_cnpj,
-                localizacao='105 - Brasil',
-                discriminacao='Saldo disponível - Clear',
-                valor_2024=0.0,
-                valor_2025=saldo_value,
-                rendimento=0.0,
-            ))
-            break  # Only add once
-    
+    # Note: saldo em conta is extracted from the "Informe de Rendimentos" (parse_xp)
+    # which has both 2024 and 2025 values. The custody document only has the 2025
+    # position and would create a duplicate with an incorrect 2024 value of R$ 0,00.
+
     return entries
 
 

@@ -1,12 +1,33 @@
+# Virtual environments
 .venv/
+.venv-1/
+
+# macOS metadata
 .DS_Store
+
+# Python cache
 __pycache__/
 *.pyc
 *.pyo
+.pytest_cache/
+
+# Credentials (sensitive)
 credentials/credentials.json
 credentials/token.json
+
+# Generated HTML examples (built artifacts)
 examples/*.html
+
+# Runtime data (sensitive / large / generated)
 input/
 output/
 temp/
+temp_extracted/
+
+# Log files
+*.log
+
+# Temporary debug scripts dumped in project root
+/debug_*.py
+# System temp
 /tmp/
