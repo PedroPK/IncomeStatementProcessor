@@ -406,7 +406,12 @@ def _write_para_irpf(wb: Workbook, df: pd.DataFrame) -> None:
                     display_desc = subtype if subtype else codigo_desc
                 else:
                     display_desc = codigo_desc
-                key = (grupo, codigo, display_desc)
+                # Bens e Direitos: each asset is a separate IRPF line item.
+                # Rendimentos sections are aggregated by type.
+                if secao == 'Bens e Direitos':
+                    key = (grupo, codigo, display_desc, r['Discriminação'] or '')
+                else:
+                    key = (grupo, codigo, display_desc)
                 if key in seen_key:
                     seen_key[key]['Valor 31/12/2024'] += r['Valor 31/12/2024']
                     seen_key[key]['Valor 31/12/2025'] += r['Valor 31/12/2025']
@@ -420,7 +425,12 @@ def _write_para_irpf(wb: Workbook, df: pd.DataFrame) -> None:
 
             for ri, r in enumerate(merged_rows):
                 fill = _ALT_FILL if ri % 2 == 1 else None
-                desc = r['Código Descrição']
+                # For Bens e Direitos, use the discriminação as the description
+                # so each individual asset is clearly identified.
+                if r.get('Seção') == 'Bens e Direitos' and r.get('Discriminação'):
+                    desc = r['Discriminação']
+                else:
+                    desc = r['Código Descrição']
                 vals = [
                     r['Seção'], r['Grupo'], r['Código'], desc,
                     r['Valor 31/12/2024'], r['Valor 31/12/2025'],

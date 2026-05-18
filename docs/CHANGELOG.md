@@ -5,6 +5,43 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere a [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.5.0] - 2026-05-17
+
+### ✨ Adicionado
+
+#### Rótulos de Renda Fixa – Novos Tipos (LCD, LIG, Debêntures)
+- **LCD** (Letra de Câmbio), **LIG** (Letra Imobiliária Garantida) e **Debêntures de Infraestrutura** adicionados ao sistema de rótulos de exibição de renda fixa
+  - Reconhecidos automaticamente por `irpfDisplayLabel()` no dashboard (JavaScript) e `_renda_fixa_subtype()` em `src/xlsx_writer.py` e `src/parser.py`
+  - Afeta a aba "Para IRPF" do dashboard HTML e a aba "Para IRPF" da planilha XLSX exportada
+  - Regras de detecção: `LCD` → "LCD – Letra de Câmbio"; `LIG` → "LIG – Letra Imobiliária Garantida"; `DEBENTURE` / `DEBÊNTURE` / prefixo `DEB ` → "Debêntures de Infraestrutura"
+
+#### Parser XP – `_xp_supplement_text()` e Extração de Discriminação
+- **`_xp_supplement_text(filename, detail_tables)`** em `src/parser.py`: helper que extrai texto suplementar de tabelas de detalhe presentes em PDFs XP
+  - PDFs XP renderizam as páginas 4-5 em layout 2 colunas; `pdfplumber` fragmentava a extração dessas páginas
+  - A nova função isola linhas de detalhe imediatamente após o ID do instrumento e monta o campo `discriminacao` completo
+  - Campo `discriminacao` das entradas XP de renda fixa agora populado com o nome completo do ativo (ex.: "Tesouro IPCA+ 2029 – Tesouro Direto"), permitindo que `irpfDisplayLabel()` / `_renda_fixa_subtype()` derivem o subtipo corretamente
+
+#### Interface Web – Botão "↺ Nova Sessão"
+- **Botão "↺ Nova Sessão"** no hero da página do stepper: permite encerrar a instância atual do servidor e iniciar uma sessão completamente limpa
+  - Envia `POST /api/restart` → servidor encerra e reinicia via `os.execv(sys.executable, [sys.executable, '-m', 'src.main'])`
+  - Frontend aguarda o servidor cair (1,5 s) e depois faz polling via `pollUntilAlive()` (até 50 tentativas × 1 s)
+  - Após reconexão bem-sucedida, redireciona automaticamente para `/`
+  - Botão desabilitado durante o processo; exibe "↺ Reiniciando..." enquanto aguarda
+
+- **Endpoint `POST /api/restart`** em `src/main.py`:
+  - Dispara o reinício em thread separada (`daemon=False`) para não bloquear a resposta HTTP
+  - Retorna `{"ok": true}` antes de encerrar o processo atual
+
+#### Interface Web – Dark Mode do Stepper
+- **Dark mode completo** para a página do stepper (`_stepper_html()`):
+  - CSS `html.dark-mode { ... }`: variáveis escuras `--bg: #0f1117`, `--card: #1a1d2e`, `--text: #e2e8f0`, `--muted: #94a3b8`, `--border: #2d3748`
+  - Overrides específicos para: gradiente do `body`, `.step-index`, `.dropzone`, `.dropzone.active`, `.progress-panel`, `.progress-track`, `.progress-file`, `.result`, `.result.error`, `iframe`
+  - Botão **"🌙 Escuro / ☀️ Claro"** no hero, ao lado do botão "↺ Nova Sessão"
+  - Preferência persistida em `localStorage('stepper-theme')` e restaurada automaticamente no carregamento da página
+  - Independente do dark mode do dashboard (que usa `localStorage('dashboard-theme')`)
+
+---
+
 ## [1.4.0] - 2026-05-16
 
 ### ✨ Adicionado

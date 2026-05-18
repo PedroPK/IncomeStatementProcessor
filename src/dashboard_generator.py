@@ -1183,7 +1183,11 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                     const seenKey   = {{}};
                     rawRows.forEach(r => {{
                         const displayLabel = irpfDisplayLabel(r);
-                        const key = `${{r.grupo || ''}}|${{r.codigo}}|${{displayLabel}}`;
+                        // Bens e Direitos: each asset must appear on its own IRPF line.
+                        // Rendimentos sections are aggregated by type within institution/section.
+                        const key = (secao === 'Bens e Direitos')
+                            ? `${{r.grupo || ''}}|${{r.codigo}}|${{r.discriminacao || displayLabel}}`
+                            : `${{r.grupo || ''}}|${{r.codigo}}|${{displayLabel}}`;
                         if (seenKey[key] !== undefined) {{
                             mergedRows[seenKey[key]].v2024      += r.v2024      || 0;
                             mergedRows[seenKey[key]].v2025      += r.v2025      || 0;
@@ -1240,7 +1244,8 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                             ${{secaoRows.map(r => {{
                                 const tickerMatch = r.discriminacao && r.discriminacao.match(/^([A-Z0-9]{{3,7}})\s*[\u2013-]/);
                                 const ticker = tickerMatch ? tickerMatch[1] : null;
-                                const descDisplay = ticker ? `<strong>${{ticker}}</strong> — ${{r.descricao}}` : r.descricao;
+                                const baseDesc = (secao === 'Bens e Direitos' && r.discriminacao) ? r.discriminacao : r.descricao;
+                                const descDisplay = ticker ? `<strong>${{ticker}}</strong> — ${{baseDesc}}` : baseDesc;
                                 return `
                                     <tr>
                                         <td>${{r.grupo || '-'}}</td>

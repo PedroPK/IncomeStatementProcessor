@@ -291,7 +291,42 @@ _run_pipeline(file_map, config)
 
 ---
 
-### 5. Módulos de Teste e Análise
+### 5. Servidor Web Local (`main.py` – modo padrão)
+
+O modo padrão (`python3 -m src.main`) inicia um servidor Flask local e abre o navegador na UI do stepper.
+
+#### Endpoints da API
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `GET` | `/` | Página do stepper (`_stepper_html()`) |
+| `GET` | `/dashboard` | Serve o dashboard HTML gerado |
+| `POST` | `/api/process` | Inicia pipeline (form-data: `source`, `files[]`) → retorna `{ok, job_id}` |
+| `GET` | `/api/progress/<job_id>` | Polling de progresso → retorna estado/percentual/ETA do job |
+| `POST` | `/api/restart` | Reinicia o processo servidor (`os.execv`) → retorna `{ok: true}` |
+
+#### Página do Stepper (`_stepper_html()`)
+
+- **Passo 1** – Selecionar Fonte e Processar: escolha entre `input/` ou drag-and-drop de PDF/ZIP/XLSX
+- **Passo 2** – Visualizar Dashboard: exibe o dashboard gerado em `<iframe>` após o processamento concluir
+- **Indicadores visuais de passo** (`stepIndicator1`, `stepIndicator2`): estados `active` / `done` com estilo CSS
+
+**Dark Mode do Stepper:**
+- Toggle "🌙 Escuro / ☀️ Claro" no hero, independente do dark mode do dashboard (iframe)
+- Classe `html.dark-mode` controla variáveis CSS: `--bg`, `--card`, `--text`, `--muted`, `--border`
+- Persistência via `localStorage('stepper-theme')`
+
+**Botão "↺ Nova Sessão":**
+- `POST /api/restart` → servidor encerra e reinicia com `os.execv(sys.executable, [...])`
+- JS faz polling com `pollUntilAlive()` (50 tentativas × 1 s) e redireciona para `/` após reconexão
+
+**Barra de Progresso em Tempo Real:**
+- Polling periódico (1 s) de `GET /api/progress/<job_id>`
+- Exibe: estágio atual, percentual, contagem de arquivos, tempo decorrido, ETA, arquivo em processamento
+
+---
+
+### 6. Módulos de Teste e Análise
 
 #### Tests (`src/tests/`)
 - `test_integration.py`: Dados mockados (12 entradas)
@@ -498,6 +533,11 @@ Páginas 4-6 (Bens e Direitos):
 ```
 
 **Helper Específico:**
+
+- **`_xp_supplement_text(filename, detail_tables)`**: extrai texto suplementar de tabelas de detalhe de ativos XP (páginas 4-5 com layout 2 colunas)
+  - Busca linha de detalhe imediatamente após a linha com ID do instrumento
+  - Compõe o campo `discriminacao` completo (ex.: "Tesouro IPCA+ 2029 – Tesouro Direto")
+  - Necessário porque `pdfplumber` fragmenta a extração em PDFs XP com colunas paralelas
 
 ```python
 def _xp_parse_detail_tables(pages_text: list[str]) -> list[Entry]
