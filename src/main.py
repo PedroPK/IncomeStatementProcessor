@@ -806,9 +806,14 @@ def _stepper_html() -> str:
 </head>
 <body>
     <div class="container">
-        <div class="hero">
-            <h1>Income Statement Processor</h1>
-            <p>Escolha a fonte dos arquivos e processe no passo 1. O dashboard atual aparece no passo 2.</p>
+        <div class="hero" style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+            <div>
+                <h1>Income Statement Processor</h1>
+                <p>Escolha a fonte dos arquivos e processe no passo 1. O dashboard atual aparece no passo 2.</p>
+            </div>
+            <button id="restartBtn" title="Encerrar instância atual e iniciar uma nova" style="flex-shrink:0; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.4); backdrop-filter:blur(4px);">
+                ↺ Nova Sessão
+            </button>
         </div>
 
         <div class="stepper">
@@ -1118,6 +1123,46 @@ def _stepper_html() -> str:
         });
 
         refreshUploadVisibility();
+
+        // ── Nova Sessão / restart ─────────────────────────────────────────────
+        const restartBtn = document.getElementById('restartBtn');
+
+        async function pollUntilAlive(attempts = 50, intervalMs = 1000) {
+            // Aguarda o servidor cair antes de tentar reconectar
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+            for (let i = 0; i < attempts; i++) {
+                await new Promise((resolve) => setTimeout(resolve, intervalMs));
+                try {
+                    const res = await fetch('/', { cache: 'no-store' });
+                    if (res.ok) return true;
+                } catch (_) {
+                    // server still down – keep polling
+                }
+            }
+            return false;
+        }
+
+        restartBtn.addEventListener('click', async () => {
+            if (!confirm('Encerrar a instância atual e iniciar uma nova sessão?')) return;
+
+            restartBtn.disabled = true;
+            restartBtn.textContent = '↺ Reiniciando...';
+
+            try {
+                await fetch('/api/restart', { method: 'POST' });
+            } catch (_) {
+                // Connection may drop immediately as server restarts – that is expected
+            }
+
+            const alive = await pollUntilAlive();
+            if (alive) {
+                window.location.href = '/';
+            } else {
+                restartBtn.disabled = false;
+                restartBtn.textContent = '↺ Nova Sessão';
+                alert('Servidor não respondeu após reinicialização. Verifique o terminal.');
+            }
+        });
     </script>
 </body>
 </html>
@@ -1261,6 +1306,30 @@ def _run_web_mode(config: dict) -> None:
                 error=str(exc),
                 terminal_last_line=f'[erro] {exc}',
             )
+
+    @app.post('/api/restart')
+    def restart_server():
+        """Inicia um novo processo e encerra o atual para liberar a porta."""
+        import subprocess
+
+        # Raiz do projeto: src/main.py -> dois níveis acima
+        project_root = str(Path(__file__).parent.parent.resolve())
+        # Preserva argumentos extras passados originalmente (ex.: config.toml, --cli)
+        extra_args = sys.argv[1:]
+
+        def _do_restart() -> None:
+            # Aguarda o response chegar ao cliente antes de matar o processo
+            time.sleep(1.2)
+            subprocess.Popen(
+                [sys.executable, '-m', 'src.main'] + extra_args,
+                cwd=project_root,
+            )
+            # Força saída imediata sem cleanup para liberar o socket
+            os._exit(0)
+
+        # daemon=False garante que o thread não seja morto antes de executar
+        threading.Thread(target=_do_restart, daemon=False).start()
+        return jsonify({'ok': True, 'message': 'Reiniciando servidor...'})
 
     @app.post('/api/process')
     def process():
