@@ -6,7 +6,9 @@ from either real XLSX data or mock test data, with light/dark mode support.
 """
 
 import json
+import re
 import tomllib
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 from src.models import Entry
@@ -61,6 +63,147 @@ def format_currency(value: float) -> str:
     return f"R$ {value:,.2f}".replace(',', 'TEMP').replace('.', ',').replace('TEMP', '.')
 
 
+def _normalize_asset_text(value: str | None) -> str:
+    """Normalize text for broker-specific asset categorization heuristics."""
+    if not value:
+        return ''
+    normalized = unicodedata.normalize('NFKD', value)
+    ascii_only = normalized.encode('ascii', 'ignore').decode('ascii')
+    return ascii_only.upper().strip()
+
+
+def _contains_token(text: str, token: str) -> bool:
+    """Return True when token appears as a standalone instrument marker."""
+    pattern = rf'(?<![A-Z0-9]){re.escape(token)}(?![A-Z0-9])'
+    return re.search(pattern, text) is not None
+
+
+def _infer_fixed_income_subtype(descricao: str | None, discriminacao: str | None) -> str | None:
+    """Return a specific fixed-income label when the instrument is identifiable.
+
+    Strategy: discriminacao is the per-asset label (e.g. "CDB BANCO MASTER",
+    "DEB CEMIG", "IPCA") and takes full priority.  descricao is the generic
+    IRPF section name (e.g. "Títulos públicos e privados sujeitos à tributação
+    (Tesouro Direto, CDB, RDB e Outros)") and must NEVER override what the
+    discriminacao says – otherwise every entry under Nubank's code 04/02 ends
+    up as "Tesouro Direto".
+    """
+    disc = _normalize_asset_text(discriminacao)
+    desc = _normalize_asset_text(descricao)
+
+    # ── Phase 1: match specific private instruments in discriminacao only ──
+    if disc:
+        if _contains_token(disc, 'CDB'):
+            return 'CDB – Certificado de Depósito Bancário'
+        if _contains_token(disc, 'RDB'):
+            return 'RDB – Recibo de Depósito Bancário'
+        if _contains_token(disc, 'LCI'):
+            return 'LCI – Letra de Crédito Imobiliário'
+        if _contains_token(disc, 'LCA'):
+            return 'LCA – Letra de Crédito do Agronegócio'
+        if _contains_token(disc, 'CRI'):
+            return 'CRI – Certificado de Recebíveis Imobiliários'
+        if _contains_token(disc, 'CRA'):
+            return 'CRA – Certificado de Recebíveis do Agronegócio'
+        if _contains_token(disc, 'LCD'):
+            return 'LCD – Letra de Câmbio'
+        if _contains_token(disc, 'LIG'):
+            return 'LIG – Letra Imobiliária Garantida'
+        if re.search(r'(?<![A-Z0-9])DEB(?:ENTURE|ENTURES)?(?![A-Z0-9])', disc):
+            return 'Debêntures de Infraestrutura'
+
+    # ── Phase 2: Tesouro Direto — check discriminacao first, fall back to
+    #    descricao only when discriminacao is absent/blank (Nubank omits it).
+    # Tesouro shorthand tickers that some brokers put in discriminacao:
+    #   IPCA, SELIC, PREFIXADO, NTN-B, NTN-F, LFT, LTN
+    _TESOURO_KEYWORDS = ('TESOURO', 'SELIC', 'LFT', 'NTN', 'LTN', 'PREFIXADO')
+    _is_tesouro_disc = disc and (
+        'TESOURO' in disc
+        or any(kw in disc for kw in ('SELIC', 'LFT', 'LTN', 'PREFIXADO'))
+        or re.search(r'\bNTN[-\s]?[BF]?\b', disc)
+        or (disc == 'IPCA')  # Nubank uses bare "IPCA" for NTN-B
+    )
+    _is_tesouro_desc = not disc and 'TESOURO' in desc
+
+    if _is_tesouro_disc or _is_tesouro_desc:
+        src = disc if _is_tesouro_disc else desc
+        if 'SELIC' in src or 'LFT' in src:
+            return 'Tesouro Selic'
+        if 'IPCA' in src or 'NTN-B' in src or 'NTNB' in src:
+            return 'Tesouro IPCA+'
+        if 'PREFIXADO' in src or 'LTN' in src or 'NTN-F' in src or 'NTNF' in src:
+            return 'Tesouro Prefixado'
+        return 'Tesouro Direto'
+
+    return None
+
+
+def _extract_ticker(text: str) -> str:
+    """Extract a likely ticker from the beginning of an asset label."""
+    match = re.match(r'^([A-Z0-9]{2,8})\b', text)
+    return match.group(1) if match else ''
+
+
+def infer_asset_category(entry: Entry) -> str:
+    """Infer the dashboard grouping label for an asset row."""
+    grupo = (entry.grupo or '').strip()
+    codigo = (entry.codigo or '').strip()
+    descricao = _normalize_asset_text(entry.codigo_desc)
+    discriminacao = _normalize_asset_text(entry.discriminacao)
+    grupo_desc = _normalize_asset_text(entry.grupo_desc)
+    observacao = _normalize_asset_text(entry.observacao)
+    instituicao = _normalize_asset_text(entry.instituicao)
+    merged_text = ' '.join(part for part in [descricao, discriminacao, grupo_desc, observacao] if part)
+    ticker = _extract_ticker(discriminacao or descricao)
+
+    subtype = _infer_fixed_income_subtype(entry.codigo_desc, entry.discriminacao)
+    if subtype:
+        return subtype
+
+    if grupo == '04' and codigo in {'02', '03'}:
+        return 'Renda Fixa'
+
+    if 'BDR' in merged_text:
+        return 'BDRs'
+
+    etf_issuers = (
+        'ISHARES', 'INVESCO', 'VANGUARD', 'SPDR', 'SCHWAB', 'PROSHARES',
+        'GLOBAL X', 'FIRST TRUST', 'VANECK', 'WISDOMTREE', 'DIREXION', 'ARK '
+    )
+    if (
+        grupo == '07' and codigo in {'03', '08'}
+        or 'ETF' in merged_text
+        or any(issuer in merged_text for issuer in etf_issuers)
+    ):
+        return 'ETFs'
+
+    if (
+        'FII' in merged_text
+        or 'FUNDO IMOBILI' in merged_text
+        or 'FUNDOS IMOBILIARI' in merged_text
+        or (grupo == '07' and codigo == '02')
+        or (grupo == '07' and codigo == '99' and ticker.endswith('11'))
+    ):
+        return 'FIIs'
+
+    if grupo == '07' or 'FUNDO' in merged_text or 'MULTIMERCADO' in merged_text:
+        return 'Fundos'
+
+    if 'VGBL' in merged_text or 'PGBL' in merged_text or grupo == '31':
+        return 'Previdência'
+
+    if (
+        'ACAO' in merged_text
+        or 'ACOES' in merged_text
+        or 'STOCK' in merged_text
+        or ((grupo in {'03', '04'} and codigo == '01') and not instituicao.startswith('INTER'))
+        or (instituicao.startswith('AVENUE') and grupo == '03' and codigo == '01')
+    ):
+        return 'Ações'
+
+    return entry.codigo_desc or 'Outros ativos'
+
+
 def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') -> None:
     """
     Generate interactive dashboard from entries with dark mode support.
@@ -84,6 +227,8 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
             'codigo': entry.codigo,
             'descricao': entry.codigo_desc,
             'discriminacao': entry.discriminacao,
+            'assetCategory': infer_asset_category(entry),
+            'fixedIncomeSubtype': _infer_fixed_income_subtype(entry.codigo_desc, entry.discriminacao),
             'v2024': entry.valor_2024,
             'v2025': entry.valor_2025,
             'rendimento': entry.rendimento,
@@ -377,6 +522,81 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
         #table-brutos tfoot tr.subtotal-row td.subtotal-label {{
             font-style: italic;
             opacity: 0.85;
+        }}
+
+        .irpf-asset-group {{
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            background: var(--bg-light-card);
+            margin-bottom: 12px;
+            overflow: hidden;
+        }}
+
+        .irpf-asset-group summary {{
+            list-style: none;
+            cursor: pointer;
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            background: rgba(102, 126, 234, 0.08);
+        }}
+
+        .irpf-asset-group summary::-webkit-details-marker {{
+            display: none;
+        }}
+
+        .irpf-asset-group summary::after {{
+            content: '▾';
+            font-size: 0.9rem;
+            color: var(--primary-color);
+        }}
+
+        .irpf-asset-group[open] summary::after {{
+            content: '▴';
+        }}
+
+        .irpf-asset-group-title {{
+            font-weight: 600;
+            color: var(--text-light);
+        }}
+
+        .irpf-asset-group-meta {{
+            display: flex;
+            gap: 14px;
+            align-items: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            white-space: nowrap;
+        }}
+
+        .irpf-asset-group table {{
+            margin-bottom: 0;
+        }}
+
+        .irpf-section-subtotal {{
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            margin-bottom: 15px;
+            font-weight: bold;
+            padding: 10px;
+            background-color: var(--bg-light-card);
+            border: 1px solid var(--border-light);
+            border-top: 2px solid var(--primary-color);
+        }}
+
+        @media (max-width: 768px) {{
+            .irpf-asset-group summary {{
+                flex-direction: column;
+                align-items: flex-start;
+            }}
+
+            .irpf-asset-group-meta {{
+                white-space: normal;
+                flex-wrap: wrap;
+            }}
         }}
         
         .section-header {{
@@ -742,10 +962,10 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
 
         function _parseNumericFilter(expr, value) {{
             // Supports: >500  >=500  <500  <=500  =500  500 (bare → >=)
-            const m = expr.trim().match(/^([><=!]=?)?(-?[\d.,]+)$/);
+            const m = expr.trim().match(/^([><=!]=?)?(-?[\\d.,]+)$/);
             if (!m) return true;    // invalid expr → don't filter
             const op  = m[1] || '>=';
-            const ref = parseFloat(m[2].replace(/\./g,'').replace(',','.'));
+            const ref = parseFloat(m[2].replace(/\\./g,'').replace(',','.'));
             if (isNaN(ref)) return true;
             switch (op) {{
                 case '>':  return value >  ref;
@@ -1090,6 +1310,11 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
         // Derive a display label for renda fixa assets from the discriminacao,
         // so that Tesouro Selic/Prefixado/IPCA+ and CDB/RDB appear as separate
         // lines in the IRPF tab instead of being merged under the same code.
+        function hasToken(text, token) {{
+            const pattern = new RegExp(`(^|[^A-Z0-9])${{token}}([^A-Z0-9]|$)`);
+            return pattern.test(text);
+        }}
+
         function irpfSubtypeFromDiscriminacao(d) {{
             if (d.includes('TESOURO')) {{
                 if (d.includes('SELIC'))     return 'Tesouro Selic';
@@ -1097,25 +1322,25 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                 if (d.includes('PREFIXADO')) return 'Tesouro Prefixado';
                 return 'Tesouro Direto';
             }}
-            if (d.includes('CDB')) return 'CDB \u2013 Certificado de Dep\u00f3sito Banc\u00e1rio';
-            if (d.includes('RDB')) return 'RDB \u2013 Recibo de Dep\u00f3sito Banc\u00e1rio';
-            if (d.includes('LCI')) return 'LCI \u2013 Letra de Cr\u00e9dito Imobili\u00e1rio';
-            if (d.includes('LCA')) return 'LCA \u2013 Letra de Cr\u00e9dito do Agroneg\u00f3cio';
-            if (d.includes('CRI')) return 'CRI \u2013 Certificado de Receb\u00edveis Imobili\u00e1rios';
-            if (d.includes('CRA')) return 'CRA \u2013 Certificado de Receb\u00edveis do Agroneg\u00f3cio';
-            if (d.includes('LCD')) return 'LCD \u2013 Letra de C\u00e2mbio';
-            if (d.includes('LIG')) return 'LIG \u2013 Letra Imobili\u00e1ria Garantida';
-            if (d.includes('DEBENTURE') || d.includes('DEB\u00caNTURE') || d.startsWith('DEB ')) return 'Deb\u00eantures de Infraestrutura';
+            if (hasToken(d, 'CDB')) return 'CDB \u2013 Certificado de Dep\u00f3sito Banc\u00e1rio';
+            if (hasToken(d, 'RDB')) return 'RDB \u2013 Recibo de Dep\u00f3sito Banc\u00e1rio';
+            if (hasToken(d, 'LCI')) return 'LCI \u2013 Letra de Cr\u00e9dito Imobili\u00e1rio';
+            if (hasToken(d, 'LCA')) return 'LCA \u2013 Letra de Cr\u00e9dito do Agroneg\u00f3cio';
+            if (hasToken(d, 'CRI')) return 'CRI \u2013 Certificado de Receb\u00edveis Imobili\u00e1rios';
+            if (hasToken(d, 'CRA')) return 'CRA \u2013 Certificado de Receb\u00edveis do Agroneg\u00f3cio';
+            if (hasToken(d, 'LCD')) return 'LCD \u2013 Letra de C\u00e2mbio';
+            if (hasToken(d, 'LIG')) return 'LIG \u2013 Letra Imobili\u00e1ria Garantida';
+            if (/(^|[^A-Z0-9])DEB(?:ENTURE|ENTURES)?([^A-Z0-9]|$)/.test(d)) return 'Deb\u00eantures de Infraestrutura';
             return null;
         }}
 
         function irpfDisplayLabel(r) {{
+            if (r.fixedIncomeSubtype) return r.fixedIncomeSubtype;
+
             if (r.grupo === '04' && (r.codigo === '02' || r.codigo === '03')) {{
                 const d = (r.discriminacao || '').toUpperCase();
                 const subtype = irpfSubtypeFromDiscriminacao(d);
                 if (subtype) return subtype;
-                // Fallback for code 02: unidentified entries are generic Tesouro Direto
-                if (r.codigo === '02') return 'Tesouro Direto';
             }}
             // XP and some brokers place CDBs under 07/08 (ETF RF) in their PDFs;
             // override the display label when the discriminacao reveals the true instrument.
@@ -1125,6 +1350,94 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                 if (subtype) return subtype;
             }}
             return r.descricao;
+        }}
+
+        function irpfAssetCategory(r) {{
+            if (r.assetCategory) return r.assetCategory;
+
+            const descricao = (r.descricao || '').toUpperCase();
+            const discriminacao = (r.discriminacao || '').toUpperCase();
+            const subtype = irpfSubtypeFromDiscriminacao(discriminacao);
+            if (subtype) return subtype;
+
+            if (descricao.includes('AÇÃO') || descricao.includes('ACOE') || discriminacao.includes(' AÇÃO') || discriminacao.includes(' ACOE')) {{
+                return 'Ações';
+            }}
+            if (descricao.includes('FII') || descricao.includes('FUNDO IMOBILI') || /\\b[A-Z]{{4}}11\\b/.test(discriminacao)) {{
+                return 'FIIs';
+            }}
+            if (descricao.includes('ETF') || discriminacao.includes('ETF')) {{
+                return 'ETFs';
+            }}
+            if (descricao.includes('BDR') || discriminacao.includes('BDR')) {{
+                return 'BDRs';
+            }}
+            if (descricao.includes('DEB') || discriminacao.includes('DEB')) {{
+                return 'Debêntures';
+            }}
+            if (descricao.includes('FUNDO') || discriminacao.includes('FUNDO')) {{
+                return 'Fundos';
+            }}
+            if (descricao.includes('TESOURO')) {{
+                return 'Tesouro Direto';
+            }}
+
+            return r.descricao || 'Outros ativos';
+        }}
+
+        function createIrpfRowsTable(rows, footerLabel) {{
+            const table = document.createElement('table');
+            table.className = 'table table-sm table-striped';
+            table.style.marginBottom = '15px';
+            const totals = {{ v2024: 0, v2025: 0, rendimento: 0, irrf: 0 }};
+
+            table.innerHTML = `
+                <thead>
+                    <tr style="background-color: var(--table-header-light);">
+                        <th>Grupo</th>
+                        <th>Código</th>
+                        <th>Descrição</th>
+                        <th class="currency">2024 (R$)</th>
+                        <th class="currency">2025 (R$)</th>
+                        <th class="currency">Rendimento (R$)</th>
+                        <th class="currency">IRRF (R$)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${{rows.map(r => {{
+                        totals.v2024 += r.v2024 || 0;
+                        totals.v2025 += r.v2025 || 0;
+                        totals.rendimento += r.rendimento || 0;
+                        totals.irrf += r.irrf || 0;
+                        const tickerMatch = r.discriminacao && r.discriminacao.match(/^([A-Z0-9]{{3,7}})\\s*[\u2013-]/);
+                        const ticker = tickerMatch ? tickerMatch[1] : null;
+                        const baseDesc = r.discriminacao || r.descricao;
+                        const descDisplay = ticker ? `<strong>${{ticker}}</strong> — ${{baseDesc}}` : baseDesc;
+                        return `
+                            <tr>
+                                <td>${{r.grupo || '-'}}</td>
+                                <td>${{r.codigo}}</td>
+                                <td>${{descDisplay}}</td>
+                                <td class="currency">${{formatCurrency(r.v2024)}}</td>
+                                <td class="currency">${{formatCurrency(r.v2025)}}</td>
+                                <td class="currency">${{formatCurrency(r.rendimento)}}</td>
+                                <td class="currency">${{formatCurrency(r.irrf)}}</td>
+                            </tr>
+                        `;
+                    }}).join('')}}
+                </tbody>
+                <tfoot>
+                    <tr style="font-weight: bold; background-color: var(--bg-light-card); border-top: 2px solid var(--border-light);">
+                        <td colspan="3">${{footerLabel}}</td>
+                        <td class="currency">${{formatCurrency(totals.v2024)}}</td>
+                        <td class="currency">${{formatCurrency(totals.v2025)}}</td>
+                        <td class="currency">${{formatCurrency(totals.rendimento)}}</td>
+                        <td class="currency">${{formatCurrency(totals.irrf)}}</td>
+                    </tr>
+                </tfoot>
+            `;
+
+            return {{ table, totals }};
         }}
 
         // Generate IRPF Tables grouped by Instituição (Broker)
@@ -1225,51 +1538,60 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                         instTotal.irrf        += r.irrf       || 0;
                     }});
 
-                    const table = document.createElement('table');
-                    table.className = 'table table-sm table-striped';
-                    table.style.marginBottom = '15px';
-                    table.innerHTML = `
-                        <thead>
-                            <tr style="background-color: var(--table-header-light);">
-                                <th>Grupo</th>
-                                <th>Código</th>
-                                <th>Descrição</th>
-                                <th class="currency">2024 (R$)</th>
-                                <th class="currency">2025 (R$)</th>
-                                <th class="currency">Rendimento (R$)</th>
-                                <th class="currency">IRRF (R$)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${{secaoRows.map(r => {{
-                                const tickerMatch = r.discriminacao && r.discriminacao.match(/^([A-Z0-9]{{3,7}})\s*[\u2013-]/);
-                                const ticker = tickerMatch ? tickerMatch[1] : null;
-                                const baseDesc = (secao === 'Bens e Direitos' && r.discriminacao) ? r.discriminacao : r.descricao;
-                                const descDisplay = ticker ? `<strong>${{ticker}}</strong> — ${{baseDesc}}` : baseDesc;
-                                return `
-                                    <tr>
-                                        <td>${{r.grupo || '-'}}</td>
-                                        <td>${{r.codigo}}</td>
-                                        <td>${{descDisplay}}</td>
-                                        <td class="currency">${{formatCurrency(r.v2024)}}</td>
-                                        <td class="currency">${{formatCurrency(r.v2025)}}</td>
-                                        <td class="currency">${{formatCurrency(r.rendimento)}}</td>
-                                        <td class="currency">${{formatCurrency(r.irrf)}}</td>
-                                    </tr>
-                                `;
-                            }}).join('')}}
-                        </tbody>
-                        <tfoot>
-                            <tr style="font-weight: bold; background-color: var(--bg-light-card); border-top: 2px solid var(--border-light);">
-                                <td colspan="3">SubTotal ${{secao}}</td>
-                                <td class="currency">${{formatCurrency(secaoTotal.v2024)}}</td>
-                                <td class="currency">${{formatCurrency(secaoTotal.v2025)}}</td>
-                                <td class="currency">${{formatCurrency(secaoTotal.rendimento)}}</td>
-                                <td class="currency">${{formatCurrency(secaoTotal.irrf)}}</td>
-                            </tr>
-                        </tfoot>
-                    `;
-                    irpfContent.appendChild(table);
+                    if (secao === 'Bens e Direitos') {{
+                        const groupedRows = {{}};
+                        secaoRows.forEach(r => {{
+                            const category = irpfAssetCategory(r);
+                            if (!groupedRows[category]) {{
+                                groupedRows[category] = [];
+                            }}
+                            groupedRows[category].push(r);
+                        }});
+
+                        Object.keys(groupedRows).sort().forEach((category, index) => {{
+                            const groupRows = groupedRows[category];
+                            const details = document.createElement('details');
+                            details.className = 'irpf-asset-group';
+                            if (index === 0) {{
+                                details.open = true;
+                            }}
+
+                            const summary = document.createElement('summary');
+                            const groupTotal = groupRows.reduce((acc, row) => {{
+                                acc.v2024 += row.v2024 || 0;
+                                acc.v2025 += row.v2025 || 0;
+                                acc.rendimento += row.rendimento || 0;
+                                acc.irrf += row.irrf || 0;
+                                return acc;
+                            }}, {{ v2024: 0, v2025: 0, rendimento: 0, irrf: 0 }});
+                            summary.innerHTML = `
+                                <span class="irpf-asset-group-title">${{category}}</span>
+                                <span class="irpf-asset-group-meta">
+                                    <span>${{groupRows.length}} registro${{groupRows.length !== 1 ? 's' : ''}}</span>
+                                    <span>Subtotal 2025: <strong>${{formatCurrency(groupTotal.v2025)}}</strong></span>
+                                </span>
+                            `;
+                            details.appendChild(summary);
+
+                            const groupTableResult = createIrpfRowsTable(groupRows, `SubTotal ${{category}}`);
+                            details.appendChild(groupTableResult.table);
+                            irpfContent.appendChild(details);
+                        }});
+
+                        const secaoSubtotalDiv = document.createElement('div');
+                        secaoSubtotalDiv.className = 'irpf-section-subtotal';
+                        secaoSubtotalDiv.innerHTML = `
+                            <div style="grid-column: 1/4;">SubTotal ${{secao}}</div>
+                            <div class="currency" style="textAlign: right;">${{formatCurrency(secaoTotal.v2024)}}</div>
+                            <div class="currency" style="textAlign: right;">${{formatCurrency(secaoTotal.v2025)}}</div>
+                            <div class="currency" style="textAlign: right;">${{formatCurrency(secaoTotal.rendimento)}}</div>
+                            <div class="currency" style="textAlign: right;">${{formatCurrency(secaoTotal.irrf)}}</div>
+                        `;
+                        irpfContent.appendChild(secaoSubtotalDiv);
+                    }} else {{
+                        const tableResult = createIrpfRowsTable(secaoRows, `SubTotal ${{secao}}`);
+                        irpfContent.appendChild(tableResult.table);
+                    }}
                 }});
                 
                 // Institution subtotal
