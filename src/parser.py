@@ -1174,7 +1174,7 @@ def parse_avenue(filename: str, pages_text: list[str],
             tipo_rendimento='Tributação Exclusiva' if (rend + dividendo) else '',
         ))
 
-    for page_tables in pages_tables[1:]:  # skip page 1 (no asset table)
+    for page_tables in pages_tables:  # page 1 also contains asset rows (e.g. AAPL, AMZN, BRKB)
         for table in page_tables:
             for row in table:
                 if not row or not row[0]:
@@ -1196,15 +1196,22 @@ def parse_avenue(filename: str, pages_text: list[str],
                 if 'Grupo' in cell0 or 'Código' in cell0:
                     continue
 
-                # Asset data row: cell0 = "03-01", cell3 = "AAPL", etc.
+                # Asset data row: cell0 = "03-01"
+                # Page 1 table has extra None columns interspersed; compact to
+                # normalise layout so symbol/company indices are consistent.
                 gc_m = re.match(r'(\d{2})-(\d{2})$', cell0.strip())
                 if not gc_m:
                     continue
                 grupo  = gc_m.group(1)
                 codigo = gc_m.group(2)
 
-                symbol  = str(row[3] or '').strip() if len(row) > 3 else ''
-                company = clean(str(row[4] or '')) if len(row) > 4 else ''
+                compact = [c for c in row if c is not None]
+                symbol  = str(compact[3] if len(compact) > 3 else '').strip()
+                company = clean(str(compact[4] if len(compact) > 4 else ''))
+
+                # Skip non-asset rows (e.g. saldo row which has no ticker symbol)
+                if not re.match(r'^[A-Z][A-Z0-9.]{0,14}$', symbol):
+                    continue
 
                 # BRL cost is the last column
                 brl_cost = 0.0
