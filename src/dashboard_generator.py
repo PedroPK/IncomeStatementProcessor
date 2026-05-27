@@ -587,13 +587,126 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
             border-top: 2px solid var(--primary-color);
         }}
 
+        /* Institution-level accordion */
+        .irpf-institution-group {{
+            border: 2px solid var(--primary-color);
+            border-radius: 10px;
+            margin-top: 20px;
+            margin-bottom: 8px;
+            overflow: hidden;
+        }}
+
+        .irpf-institution-group > summary {{
+            list-style: none;
+            cursor: pointer;
+            padding: 14px 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 14px;
+            background: rgba(102, 126, 234, 0.18);
+            border-bottom: 2px solid var(--primary-color);
+        }}
+
+        .irpf-institution-group > summary::-webkit-details-marker {{
+            display: none;
+        }}
+
+        .irpf-institution-group > summary::after {{
+            content: '▾';
+            font-size: 1rem;
+            color: var(--primary-color);
+        }}
+
+        .irpf-institution-group[open] > summary::after {{
+            content: '▴';
+        }}
+
+        .irpf-institution-name {{
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--primary-color);
+            letter-spacing: 0.04em;
+        }}
+
+        .irpf-institution-meta {{
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            white-space: nowrap;
+        }}
+
+        .irpf-institution-body {{
+            padding: 12px 16px 4px 16px;
+        }}
+
+        /* Section-level accordion */
+        .irpf-section-group {{
+            border: 1px solid var(--border-light);
+            border-left: 3px solid var(--secondary-color);
+            border-radius: 6px;
+            margin-top: 10px;
+            margin-bottom: 6px;
+            overflow: hidden;
+        }}
+
+        .irpf-section-group > summary {{
+            list-style: none;
+            cursor: pointer;
+            padding: 10px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            background: rgba(118, 75, 162, 0.07);
+        }}
+
+        .irpf-section-group > summary::-webkit-details-marker {{
+            display: none;
+        }}
+
+        .irpf-section-group > summary::after {{
+            content: '▾';
+            font-size: 0.85rem;
+            color: var(--secondary-color);
+        }}
+
+        .irpf-section-group[open] > summary::after {{
+            content: '▴';
+        }}
+
+        .irpf-section-name {{
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--secondary-color);
+        }}
+
+        .irpf-section-meta {{
+            display: flex;
+            gap: 14px;
+            align-items: center;
+            color: var(--text-muted);
+            font-size: 0.82rem;
+            white-space: nowrap;
+        }}
+
+        .irpf-section-body {{
+            padding: 8px 10px 4px 10px;
+        }}
+
         @media (max-width: 768px) {{
-            .irpf-asset-group summary {{
+            .irpf-asset-group summary,
+            .irpf-institution-group > summary,
+            .irpf-section-group > summary {{
                 flex-direction: column;
                 align-items: flex-start;
             }}
 
-            .irpf-asset-group-meta {{
+            .irpf-asset-group-meta,
+            .irpf-institution-meta,
+            .irpf-section-meta {{
                 white-space: normal;
                 flex-wrap: wrap;
             }}
@@ -1466,25 +1579,42 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
 
             // Sort instituições alphabetically
             const sortedInstitucoes = Object.keys(instituicoes).sort();
-            
-            sortedInstitucoes.forEach(instituicao => {{
-                // Institution header
-                const instDiv = document.createElement('div');
-                instDiv.className = 'institution-header';
-                instDiv.style.marginTop = '20px';
-                instDiv.style.marginBottom = '10px';
-                instDiv.style.fontSize = '18px';
-                instDiv.style.fontWeight = 'bold';
-                instDiv.style.color = 'var(--primary-color)';
-                instDiv.style.borderBottom = '2px solid var(--primary-color)';
-                instDiv.style.paddingBottom = '5px';
-                instDiv.textContent = instituicao.toUpperCase();
-                irpfContent.appendChild(instDiv);
 
+            sortedInstitucoes.forEach(instituicao => {{
                 const instData = instituicoes[instituicao];
                 const sortedSecoes = Object.keys(instData).sort();
+
+                // Pre-compute institution total from raw rows so the summary can
+                // display it before the sections are rendered.
                 let instTotal = {{ v2024: 0, v2025: 0, rendimento: 0, irrf: 0 }};
-                
+                sortedSecoes.forEach(s => instData[s].forEach(r => {{
+                    instTotal.v2024      += r.v2024      || 0;
+                    instTotal.v2025      += r.v2025      || 0;
+                    instTotal.rendimento += r.rendimento || 0;
+                    instTotal.irrf       += r.irrf       || 0;
+                }}));
+
+                // Institution-level collapsible accordion
+                const instDetails = document.createElement('details');
+                instDetails.className = 'irpf-institution-group';
+                instDetails.open = true;
+
+                const instSummary = document.createElement('summary');
+                instSummary.innerHTML = `
+                    <span class="irpf-institution-name">${{instituicao.toUpperCase()}}</span>
+                    <span class="irpf-institution-meta">
+                        <span>${{sortedSecoes.length}} seção${{sortedSecoes.length !== 1 ? 'ões' : ''}}</span>
+                        <span>2025: <strong>${{formatCurrency(instTotal.v2025)}}</strong></span>
+                        <span>Rendimentos: <strong>${{formatCurrency(instTotal.rendimento)}}</strong></span>
+                    </span>
+                `;
+                instDetails.appendChild(instSummary);
+
+                const instBody = document.createElement('div');
+                instBody.className = 'irpf-institution-body';
+                instDetails.appendChild(instBody);
+                irpfContent.appendChild(instDetails);
+
                 // For each seção within this instituição
                 sortedSecoes.forEach(secao => {{
                     const rawRows = instData[secao];
@@ -1515,28 +1645,35 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                     }});
                     const secaoRows = mergedRows;
 
-                    // Section subheader
-                    const secaoDiv = document.createElement('div');
-                    secaoDiv.style.marginTop = '10px';
-                    secaoDiv.style.marginBottom = '5px';
-                    secaoDiv.style.fontSize = '14px';
-                    secaoDiv.style.fontWeight = '600';
-                    secaoDiv.style.color = 'var(--secondary-color)';
-                    secaoDiv.textContent = secao;
-                    irpfContent.appendChild(secaoDiv);
-
-                    // Accumulate section and institution totals before rendering
+                    // Accumulate section total
                     const secaoTotal = {{ v2024: 0, v2025: 0, rendimento: 0, irrf: 0 }};
                     secaoRows.forEach(r => {{
                         secaoTotal.v2024      += r.v2024      || 0;
                         secaoTotal.v2025      += r.v2025      || 0;
                         secaoTotal.rendimento += r.rendimento || 0;
                         secaoTotal.irrf       += r.irrf       || 0;
-                        instTotal.v2024       += r.v2024      || 0;
-                        instTotal.v2025       += r.v2025      || 0;
-                        instTotal.rendimento  += r.rendimento || 0;
-                        instTotal.irrf        += r.irrf       || 0;
                     }});
+
+                    // Section-level collapsible accordion
+                    const secaoDetails = document.createElement('details');
+                    secaoDetails.className = 'irpf-section-group';
+                    secaoDetails.open = true;
+
+                    const secaoSummary = document.createElement('summary');
+                    secaoSummary.innerHTML = `
+                        <span class="irpf-section-name">${{secao}}</span>
+                        <span class="irpf-section-meta">
+                            <span>${{secaoRows.length}} item${{secaoRows.length !== 1 ? 's' : ''}}</span>
+                            <span>2025: <strong>${{formatCurrency(secaoTotal.v2025)}}</strong></span>
+                            <span>Rendimentos: <strong>${{formatCurrency(secaoTotal.rendimento)}}</strong></span>
+                        </span>
+                    `;
+                    secaoDetails.appendChild(secaoSummary);
+
+                    const secaoBody = document.createElement('div');
+                    secaoBody.className = 'irpf-section-body';
+                    secaoDetails.appendChild(secaoBody);
+                    instBody.appendChild(secaoDetails);
 
                     if (secao === 'Bens e Direitos') {{
                         const groupedRows = {{}};
@@ -1575,7 +1712,7 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
 
                             const groupTableResult = createIrpfRowsTable(groupRows, `SubTotal ${{category}}`);
                             details.appendChild(groupTableResult.table);
-                            irpfContent.appendChild(details);
+                            secaoBody.appendChild(details);
                         }});
 
                         const secaoSubtotalDiv = document.createElement('div');
@@ -1587,19 +1724,20 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                             <div class="currency" style="textAlign: right;">${{formatCurrency(secaoTotal.rendimento)}}</div>
                             <div class="currency" style="textAlign: right;">${{formatCurrency(secaoTotal.irrf)}}</div>
                         `;
-                        irpfContent.appendChild(secaoSubtotalDiv);
+                        secaoBody.appendChild(secaoSubtotalDiv);
                     }} else {{
                         const tableResult = createIrpfRowsTable(secaoRows, `SubTotal ${{secao}}`);
-                        irpfContent.appendChild(tableResult.table);
+                        secaoBody.appendChild(tableResult.table);
                     }}
                 }});
-                
-                // Institution subtotal
+
+                // Institution subtotal (inside the institution accordion body)
                 const instSubtotalDiv = document.createElement('div');
                 instSubtotalDiv.style.display = 'grid';
                 instSubtotalDiv.style.gridTemplateColumns = 'repeat(7, 1fr)';
                 instSubtotalDiv.style.gap = '5px';
-                instSubtotalDiv.style.marginBottom = '20px';
+                instSubtotalDiv.style.marginTop = '6px';
+                instSubtotalDiv.style.marginBottom = '8px';
                 instSubtotalDiv.style.fontWeight = 'bold';
                 instSubtotalDiv.style.padding = '10px';
                 instSubtotalDiv.style.backgroundColor = 'var(--bg-light-card)';
@@ -1611,7 +1749,7 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
                     <div class="currency" style="textAlign: right;">${{formatCurrency(instTotal.rendimento)}}</div>
                     <div class="currency" style="textAlign: right;">${{formatCurrency(instTotal.irrf)}}</div>
                 `;
-                irpfContent.appendChild(instSubtotalDiv);
+                instBody.appendChild(instSubtotalDiv);
             }});
             
             // Grand Total
