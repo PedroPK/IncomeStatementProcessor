@@ -33,11 +33,11 @@ except ModuleNotFoundError:
     except ModuleNotFoundError:
         tomllib = None  # type: ignore[assignment]
 
+from src import __version__
 from src.extractor import extract_zip, find_zip
 from src.parser import parse_file
 from src.custodia_parser import parse_custodia_xlsx
 from src.xlsx_writer import write_xlsx
-
 
 # ── Supported file extensions ─────────────────────────────────────────────────
 _PDF_EXTENSIONS = {'.pdf', '.aspx', '.asp'}   # ASPX is served as PDF by some portals
@@ -526,7 +526,10 @@ def _run_pipeline(
 
 
 def _stepper_html() -> str:
-    return """<!DOCTYPE html>
+    return _STEPPER_HTML_TEMPLATE.replace('%%VERSION%%', __version__)
+
+
+_STEPPER_HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -860,7 +863,7 @@ def _stepper_html() -> str:
     <div class="container">
         <div class="hero" style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
             <div>
-                <h1>Income Statement Processor</h1>
+                <h1>Income Statement Processor <span style="font-size:0.85rem; font-weight:400; opacity:0.75; letter-spacing:0.02em;">v%%VERSION%%</span></h1>
                 <p>Escolha a fonte dos arquivos e processe no passo 1. O dashboard atual aparece no passo 2.</p>
             </div>
             <button id="restartBtn" title="Encerrar instância atual e iniciar uma nova" style="flex-shrink:0; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.4); backdrop-filter:blur(4px);">
@@ -1205,8 +1208,21 @@ def _stepper_html() -> str:
         // ── Nova Sessão / restart ─────────────────────────────────────────────
         const restartBtn = document.getElementById('restartBtn');
 
-        restartBtn.addEventListener('click', () => {
-            window.location.reload();
+        restartBtn.addEventListener('click', async () => {
+            restartBtn.disabled = true;
+            restartBtn.textContent = '⏳ Reiniciando...';
+            try {
+                await fetch('/api/restart', { method: 'POST' });
+            } catch (_) { /* servidor fechou a conexão — esperado */ }
+            // Aguarda o servidor subir novamente e recarrega
+            const poll = async () => {
+                try {
+                    const r = await fetch('/api/status', { cache: 'no-store' });
+                    if (r.ok) { window.location.reload(); return; }
+                } catch (_) {}
+                setTimeout(poll, 600);
+            };
+            setTimeout(poll, 1500);
         });
     </script>
 </body>
@@ -1216,6 +1232,7 @@ def _stepper_html() -> str:
 
 def _run_cli_mode(config: dict) -> None:
     """Legacy mode: process first ZIP from input/ immediately."""
+    print(f'Income Statement Processor v{__version__}')
     zip_path = find_zip('input')
     if not zip_path:
         print('[erro] Nenhum arquivo ZIP encontrado em input/. Encerrando.')
@@ -1352,6 +1369,10 @@ def _run_web_mode(config: dict) -> None:
                 terminal_last_line=f'[erro] {exc}',
             )
 
+    @app.get('/api/status')
+    def api_status():
+        return jsonify({'ok': True, 'version': __version__})
+
     @app.post('/api/restart')
     def restart_server():
         """Inicia um novo processo e encerra o atual para liberar a porta."""
@@ -1417,7 +1438,8 @@ def _run_web_mode(config: dict) -> None:
     host = '127.0.0.1'
     port = 8765
     web_url = f'http://{host}:{port}'
-    print(f'\nInterface web iniciada em {web_url}')
+    print(f'\nIncome Statement Processor v{__version__}')
+    print(f'Interface web iniciada em {web_url}')
     print('Use --cli para o comportamento anterior (processar input/ diretamente).')
 
     try:

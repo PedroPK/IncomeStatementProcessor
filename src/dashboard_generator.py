@@ -11,6 +11,7 @@ import tomllib
 import unicodedata
 from datetime import datetime
 from pathlib import Path
+from src import __version__
 from src.models import Entry
 
 
@@ -767,6 +768,7 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
             <div style="display:flex; align-items:center; gap:10px;">
                 <span style="color:#ffffff; font-weight:bold; font-size:1.5rem;">📊 Income Statement Processor</span>
                 <span style="color:rgba(255,255,255,0.85); font-size:1rem;">Dashboard - IRPF 2026</span>
+                <span style="color:rgba(255,255,255,0.6); font-size:0.8rem; margin-left:4px;">v{__version__}</span>
             </div>
             <button class="theme-toggle" onclick="toggleTheme()">
                 <span id="theme-icon">🌙 Dark Mode</span>
@@ -963,8 +965,8 @@ def generate_dashboard_html(entries: list, output_path: str = 'dashboard.html') 
         <!-- Footer -->
         <footer class="text-center mt-5 mb-3">
             <small>
-                Income Statement Processor v1.1.0 | 
-                Gerado em 2026-05-02 | 
+                Income Statement Processor v{__version__} | 
+                Gerado em {generated_at} | 
                 Com suporte a Dark Mode 🌙
             </small>
         </footer>
