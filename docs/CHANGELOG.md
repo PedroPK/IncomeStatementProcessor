@@ -5,12 +5,25 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere a [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.7.5] - 2026-05-27
+
+### ♻️ Refatorado
+
+#### Template HTML do Stepper extraído para `src/templates/stepper.html`
+- As ~896 linhas de HTML que compunham `_STEPPER_HTML_TEMPLATE` em `src/main.py` foram movidas para **`src/templates/stepper.html`**, seguindo o mesmo padrão de `src/templates/dashboard.html`.
+- `src/main.py` passou de ~1 680 para **787 linhas** (redução de ~53%).
+- Constante `_STEPPER_TEMPLATE_PATH` aponta para o arquivo via `Path(__file__).parent / 'templates' / 'stepper.html'`.
+- Função `_stepper_html()` reescrita para ler o arquivo em disco e substituir `%%VERSION%%` em tempo de execução — comportamento idêntico ao anterior.
+- Nenhuma funcionalidade alterada; todos os 12 testes continuam passando.
+
+---
+
 ## [1.7.4] - 2026-05-27
 
 ### ✨ Adicionado
 
 #### Interface Web – Card "O que este aplicativo faz?" na tela inicial
-- Novo **card de boas-vindas** (`#aboutCard`) exibido entre o cabeçalho (hero) e os indicadores de passo na tela inicial do stepper (`_STEPPER_HTML_TEMPLATE` em `src/main.py`).
+- Novo **card de boas-vindas** (`#aboutCard`) exibido entre o cabeçalho (hero) e os indicadores de passo na tela inicial do stepper (`src/templates/stepper.html`).
   - **3 colunas visuais** descrevendo o fluxo completo:
     - 📂 *Envie seus Informes* — PDFs/ZIPs com os Informes de Rendimentos.
     - ⚙️ *Processamento Automático* — extração, normalização e consolidação de dados.

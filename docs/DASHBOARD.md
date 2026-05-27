@@ -102,6 +102,8 @@ Quatro abas interativas com dados sincronizados com XLSX:
 
 A aplicação é iniciada com `python3 -m src.main` e abre automaticamente uma interface web local. A **tela inicial** (stepper) guia o usuário pelo fluxo em dois passos.
 
+> **Arquivo de template**: [`src/templates/stepper.html`](../src/templates/stepper.html) — carregado em runtime por `_stepper_html()` em `src/main.py`.
+
 ### Card de Boas-Vindas ("O que este aplicativo faz?")
 
 Exibido na primeira visita, o card explica a proposta de valor da ferramenta em 3 colunas visuais:

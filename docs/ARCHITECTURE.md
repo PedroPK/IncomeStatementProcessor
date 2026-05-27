@@ -381,6 +381,7 @@ O modo padrão (`python3 -m src.main`) inicia um servidor Flask local e abre o n
 
 #### Página do Stepper (`_stepper_html()`)
 
+- Template HTML em **`src/templates/stepper.html`** (~896 linhas); carregado em runtime por `_stepper_html()` via `_STEPPER_TEMPLATE_PATH.read_text()` com substituição de `%%VERSION%%`.
 - **Passo 1** – Selecionar Fonte e Processar: escolha entre `input/` ou drag-and-drop de PDF/ZIP/XLSX
 - **Passo 2** – Visualizar Dashboard: exibe o dashboard gerado em `<iframe>` após o processamento concluir
 - **Indicadores visuais de passo** (`stepIndicator1`, `stepIndicator2`): estados `active` / `done` com estilo CSS

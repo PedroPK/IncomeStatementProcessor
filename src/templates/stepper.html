@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Income Statement Processor - Processamento</title>
+    <style>
+        :root {
+            --primary: #667eea;
+            --secondary: #764ba2;
+            --ok: #2e7d32;
+            --bg: #f5f7fb;
+            --card: #ffffff;
+            --text: #1f2937;
+            --muted: #6b7280;
+            --border: #dfe5f3;
+        }
+
+        html.dark-mode {
+            --bg: #0f1117;
+            --card: #1a1d2e;
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+            --border: #2d3748;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text);
+            background: radial-gradient(circle at top right, #e6ecff 0%, var(--bg) 45%, #eff2fb 100%);
+        }
+
+        html.dark-mode body {
+            background: radial-gradient(circle at top right, #1a1d2e 0%, var(--bg) 45%, #151928 100%);
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 24px 16px 40px;
+        }
+
+        .hero {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: #fff;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 8px 24px rgba(58, 74, 130, 0.25);
+            margin-bottom: 18px;
+        }
+
+        .hero h1 {
+            margin: 0;
+            font-size: 1.6rem;
+        }
+
+        .hero p {
+            margin: 6px 0 0;
+            opacity: 0.9;
+        }
+
+        .about-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 18px 20px 16px;
+            margin-bottom: 18px;
+            box-shadow: 0 4px 16px rgba(11, 23, 61, 0.05);
+        }
+
+        .about-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+
+        .about-card-header h2 {
+            margin: 0;
+            font-size: 1rem;
+            color: var(--text);
+        }
+
+        .about-dismiss {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--muted);
+            font-size: 0.82rem;
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 400;
+        }
+
+        .about-dismiss:hover {
+            background: var(--border);
+        }
+
+        .about-cols {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        @media (max-width: 640px) {
+            .about-cols { grid-template-columns: 1fr; }
+        }
+
+        .about-col {
+            background: #f8faff;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 14px;
+            text-align: center;
+        }
+
+        html.dark-mode .about-col {
+            background: #151928;
+        }
+
+        .about-col .icon {
+            font-size: 1.7rem;
+            margin-bottom: 6px;
+        }
+
+        .about-col strong {
+            display: block;
+            font-size: 0.92rem;
+            margin-bottom: 4px;
+            color: var(--text);
+        }
+
+        .about-col p {
+            margin: 0;
+            font-size: 0.82rem;
+            color: var(--muted);
+            line-height: 1.45;
+        }
+
+        .about-arrow {
+            display: none;
+        }
+
+        @media (min-width: 641px) {
+            .about-arrow {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: var(--muted);
+                font-size: 1.2rem;
+            }
+        }
+
+        .about-institutions {
+            font-size: 0.82rem;
+            color: var(--muted);
+            border-top: 1px solid var(--border);
+            padding-top: 10px;
+        }
+
+        .about-institutions strong {
+            color: var(--text);
+        }
+
+        .inst-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 6px;
+        }
+
+        .inst-chip {
+            background: #eef1fb;
+            border: 1px solid #d0d8f5;
+            border-radius: 20px;
+            padding: 2px 10px;
+            font-size: 0.8rem;
+            color: #4f46e5;
+            font-weight: 600;
+        }
+
+        html.dark-mode .inst-chip {
+            background: #1e2a4a;
+            border-color: #3b4d7a;
+            color: #93a8f5;
+        }
+
+        .stepper {
+            display: flex;
+            gap: 12px;
+            margin: 16px 0 22px;
+        }
+
+        .step {
+            flex: 1;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .step-index {
+            width: 28px;
+            height: 28px;
+            border-radius: 999px;
+            border: 2px solid var(--border);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: var(--muted);
+            background: #fff;
+        }
+
+        html.dark-mode .step-index {
+            background: var(--card);
+        }
+
+        .step.active {
+            border-color: #b9c6f5;
+            box-shadow: 0 3px 12px rgba(102, 126, 234, 0.15);
+        }
+
+        .step.active .step-index {
+            border-color: var(--primary);
+            color: #fff;
+            background: var(--primary);
+        }
+
+        .step.done .step-index {
+            border-color: var(--ok);
+            background: var(--ok);
+            color: #fff;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 18px;
+            box-shadow: 0 4px 16px rgba(11, 23, 61, 0.06);
+        }
+
+        .options {
+            display: grid;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .option {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px;
+        }
+
+        .option label {
+            cursor: pointer;
+            display: inline-flex;
+            gap: 8px;
+            align-items: center;
+            font-weight: 600;
+        }
+
+        .option p {
+            margin: 7px 0 0 26px;
+            color: var(--muted);
+            font-size: 0.92rem;
+        }
+
+        .dropzone {
+            margin-top: 14px;
+            border: 2px dashed #b9c6f5;
+            border-radius: 12px;
+            min-height: 130px;
+            padding: 18px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            background: #f8faff;
+            color: var(--muted);
+            transition: all 0.2s;
+        }
+
+        html.dark-mode .dropzone {
+            background: #151928;
+            border-color: #3b4d7a;
+        }
+
+        .dropzone.active {
+            border-color: var(--primary);
+            background: #edf2ff;
+            color: var(--text);
+        }
+
+        html.dark-mode .dropzone.active {
+            background: #1e2a4a;
+        }
+
+        .file-list {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: var(--muted);
+            word-break: break-word;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-top: 16px;
+        }
+
+        button {
+            border: 0;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: #fff;
+            font-weight: 600;
+            border-radius: 10px;
+            padding: 10px 16px;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .status {
+            color: var(--muted);
+            font-size: 0.92rem;
+        }
+
+        .progress-panel {
+            margin-top: 14px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px;
+            background: #f8faff;
+            display: none;
+        }
+
+        html.dark-mode .progress-panel {
+            background: #151928;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            color: var(--muted);
+        }
+
+        .progress-track {
+            width: 100%;
+            height: 12px;
+            background: #e9eefc;
+            border-radius: 999px;
+            overflow: hidden;
+            border: 1px solid #d8e1fb;
+        }
+
+        html.dark-mode .progress-track {
+            background: #1e2a4a;
+            border-color: #2d3748;
+        }
+
+        .progress-fill {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #4f46e5, #0ea5e9);
+            transition: width 0.25s ease;
+        }
+
+        .progress-meta {
+            margin-top: 8px;
+            font-size: 0.88rem;
+            color: var(--muted);
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 6px;
+        }
+
+        .progress-meta strong {
+            color: var(--text);
+        }
+
+        .progress-file {
+            margin-top: 8px;
+            font-size: 0.9rem;
+            color: #334155;
+            word-break: break-word;
+        }
+
+        html.dark-mode .progress-file {
+            color: var(--muted);
+        }
+
+        #step2 {
+            display: none;
+            margin-top: 14px;
+        }
+
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.92rem;
+            background: #f4f6fb;
+            border: 1px solid var(--border);
+        }
+
+        html.dark-mode .result {
+            background: #1a1d2e;
+        }
+
+        .result.error {
+            background: #fff1f1;
+            border-color: #f4b4b4;
+            color: #7f1d1d;
+        }
+
+        html.dark-mode .result.error {
+            background: #2d1515;
+            border-color: #7f2020;
+            color: #fca5a5;
+        }
+
+        iframe {
+            width: 100%;
+            min-height: 82vh;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: #fff;
+        }
+
+        html.dark-mode iframe {
+            background: var(--card);
+        }
+
+        @media (max-width: 768px) {
+            .stepper { flex-direction: column; }
+            iframe { min-height: 70vh; }
+            .progress-meta { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="hero" style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+            <div>
+                <h1>Income Statement Processor <span style="font-size:0.85rem; font-weight:400; opacity:0.75; letter-spacing:0.02em;">v%%VERSION%%</span></h1>
+                <p>Escolha a fonte dos arquivos e processe no passo 1. O dashboard atual aparece no passo 2.</p>
+            </div>
+            <button id="restartBtn" title="Encerrar instância atual e iniciar uma nova" style="flex-shrink:0; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.4); backdrop-filter:blur(4px);">
+                ↺ Nova Sessão
+            </button>
+            <button id="shutdownBtn" title="Desligar a aplicação e fechar o dashboard" style="flex-shrink:0; background:rgba(220,53,69,0.25); border:1px solid rgba(255,100,100,0.5); backdrop-filter:blur(4px);">
+                ⏹ Desligar
+            </button>
+            <button id="themeBtn" title="Alternar modo escuro/claro" style="flex-shrink:0; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.4); backdrop-filter:blur(4px);">
+                🌙 Escuro
+            </button>
+        </div>
+
+        <div class="about-card" id="aboutCard">
+            <div class="about-card-header">
+                <h2>🚀 O que este aplicativo faz?</h2>
+                <button class="about-dismiss" id="aboutDismiss" title="Não mostrar novamente">Não mostrar novamente</button>
+            </div>
+
+            <div class="about-cols">
+                <div class="about-col">
+                    <div class="icon">📂</div>
+                    <strong>Envie seus Informes</strong>
+                    <p>Arraste PDFs ou ZIPs com os Informes de Rendimentos emitidos pelas suas instituições financeiras.</p>
+                </div>
+                <div class="about-col">
+                    <div class="icon">⚙️</div>
+                    <strong>Processamento Automático</strong>
+                    <p>A aplicação extrai, normaliza e consolida todos os valores automaticamente — sem intervenção manual.</p>
+                </div>
+                <div class="about-col">
+                    <div class="icon">📊</div>
+                    <strong>Dashboard Interativo</strong>
+                    <p>Receba um relatório visual completo com gráficos, tabelas e exportação para Excel prontos para o IRPF.</p>
+                </div>
+            </div>
+
+            <div class="about-institutions">
+                <strong>Instituições suportadas:</strong>
+                <div class="inst-chips">
+                    <span class="inst-chip">Accenture</span>
+                    <span class="inst-chip">Avenue Securities</span>
+                    <span class="inst-chip">Clear</span>
+                    <span class="inst-chip">Inter</span>
+                    <span class="inst-chip">NuBank</span>
+                    <span class="inst-chip">XP Investimentos</span>
+                    <span class="inst-chip">XP Vida e Previdência</span>
+                    <span class="inst-chip">+ XLSX de custódia</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="stepper">
+            <div class="step active" id="stepIndicator1">
+                <span class="step-index">1</span>
+                <div>
+                    <div><strong>Selecionar Fonte e Processar</strong></div>
+                    <div class="status">Input ou drag-and-drop de PDF/ZIP</div>
+                </div>
+            </div>
+            <div class="step" id="stepIndicator2">
+                <span class="step-index">2</span>
+                <div>
+                    <div><strong>Visualizar Dashboard</strong></div>
+                    <div class="status">Estrutura existente do dashboard</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" id="step1">
+            <h2 style="margin-top:0; font-size:1.2rem;">Passo 1: Como deseja processar?</h2>
+
+            <div class="options">
+                <div class="option">
+                    <label>
+                        <input type="radio" name="source" value="input" checked>
+                        Usar arquivos da pasta input/
+                    </label>
+                    <p>Usa o primeiro ZIP encontrado em input/ como no fluxo atual.</p>
+                </div>
+
+                <div class="option">
+                    <label>
+                        <input type="radio" name="source" value="upload">
+                        Arrastar PDF(s) ou ZIP com PDF(s)
+                    </label>
+                    <p>Envie um ou mais PDFs e/ou ZIPs para processamento imediato.</p>
+                </div>
+            </div>
+
+            <div class="dropzone" id="dropzone">
+                <div>
+                    <div style="font-weight:600; color:#334155; margin-bottom:4px;">Solte arquivos aqui</div>
+                    <div>Ou clique para selecionar PDF/ZIP/XLSX</div>
+                    <input id="fileInput" type="file" multiple style="display:none;" accept=".pdf,.zip,.aspx,.asp,.xlsx,.xls">
+                </div>
+            </div>
+            <div class="file-list" id="fileList"></div>
+
+            <div class="actions">
+                <button id="processBtn">Processar</button>
+                <span class="status" id="statusText">Aguardando ação.</span>
+            </div>
+
+            <div class="progress-panel" id="progressPanel">
+                <div class="progress-header">
+                    <span id="progressStage">Aguardando...</span>
+                    <strong id="progressPercent">0.0%</strong>
+                </div>
+                <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-meta">
+                    <div>Concluídos: <strong id="progressCount">0/0</strong></div>
+                    <div>Decorrido: <strong id="elapsedText">00:00</strong></div>
+                    <div>ETA: <strong id="etaText">--:--</strong></div>
+                    <div>Atualização: <strong id="updatedText">--</strong></div>
+                </div>
+                <div class="progress-file" id="currentFileText">Arquivo atual: -</div>
+            </div>
+
+            <div id="resultBox" class="result" style="display:none;"></div>
+        </div>
+
+        <div id="step2">
+            <iframe id="dashboardFrame" title="Dashboard"></iframe>
+        </div>
+    </div>
+
+    <script>
+        // ── About card visibility ─────────────────────────────────────────────
+        (function () {
+            const card = document.getElementById('aboutCard');
+            const btn  = document.getElementById('aboutDismiss');
+            if (localStorage.getItem('aboutDismissed') === '1') {
+                card.style.display = 'none';
+            }
+            btn.addEventListener('click', function () {
+                card.style.display = 'none';
+                localStorage.setItem('aboutDismissed', '1');
+            });
+        })();
+
+        let selectedFiles = [];
+        let progressTimer = null;
+
+        const sourceRadios = document.querySelectorAll('input[name="source"]');
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const processBtn = document.getElementById('processBtn');
+        const statusText = document.getElementById('statusText');
+        const resultBox = document.getElementById('resultBox');
+        const step2 = document.getElementById('step2');
+        const dashboardFrame = document.getElementById('dashboardFrame');
+        const stepIndicator1 = document.getElementById('stepIndicator1');
+        const stepIndicator2 = document.getElementById('stepIndicator2');
+        const progressPanel = document.getElementById('progressPanel');
+        const progressStage = document.getElementById('progressStage');
+        const progressPercent = document.getElementById('progressPercent');
+        const progressFill = document.getElementById('progressFill');
+        const progressCount = document.getElementById('progressCount');
+        const elapsedText = document.getElementById('elapsedText');
+        const etaText = document.getElementById('etaText');
+        const updatedText = document.getElementById('updatedText');
+        const currentFileText = document.getElementById('currentFileText');
+
+        function currentSource() {
+            return document.querySelector('input[name="source"]:checked').value;
+        }
+
+        function refreshUploadVisibility() {
+            const upload = currentSource() === 'upload';
+            dropzone.style.display = upload ? 'flex' : 'none';
+            if (!upload) {
+                selectedFiles = [];
+                fileList.textContent = '';
+            }
+        }
+
+        function showFiles() {
+            if (!selectedFiles.length) {
+                fileList.textContent = 'Nenhum arquivo selecionado.';
+                return;
+            }
+            fileList.textContent = 'Arquivos: ' + selectedFiles.map((f) => f.name).join(', ');
+        }
+
+        sourceRadios.forEach((radio) => {
+            radio.addEventListener('change', refreshUploadVisibility);
+        });
+
+        dropzone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', () => {
+            selectedFiles = Array.from(fileInput.files || []);
+            showFiles();
+        });
+
+        ['dragenter', 'dragover'].forEach((eventName) => {
+            dropzone.addEventListener(eventName, (event) => {
+                event.preventDefault();
+                dropzone.classList.add('active');
+            });
+        });
+
+        ['dragleave', 'drop'].forEach((eventName) => {
+            dropzone.addEventListener(eventName, (event) => {
+                event.preventDefault();
+                dropzone.classList.remove('active');
+            });
+        });
+
+        dropzone.addEventListener('drop', (event) => {
+            selectedFiles = Array.from(event.dataTransfer.files || []);
+            showFiles();
+        });
+
+        function setResult(message, isError = false) {
+            resultBox.style.display = 'block';
+            resultBox.textContent = message;
+            if (isError) {
+                resultBox.classList.add('error');
+            } else {
+                resultBox.classList.remove('error');
+            }
+        }
+
+        function goToStep2(dashboardUrl) {
+            stepIndicator1.classList.remove('active');
+            stepIndicator1.classList.add('done');
+            stepIndicator2.classList.add('active');
+            step2.style.display = 'block';
+            dashboardFrame.src = dashboardUrl;
+            step2.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function formatDuration(seconds) {
+            if (seconds === null || seconds === undefined) {
+                return '--:--';
+            }
+            const total = Math.max(0, Math.floor(Number(seconds)));
+            const hours = Math.floor(total / 3600);
+            const minutes = Math.floor((total % 3600) / 60);
+            const secs = total % 60;
+            if (hours > 0) {
+                return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            }
+            return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+
+        function updateProgressPanel(payload) {
+            progressPanel.style.display = 'block';
+
+            const pct = Number(payload.percent || 0);
+            const safePct = Math.max(0, Math.min(100, pct));
+            progressStage.textContent = payload.stage || 'Processando...';
+            progressPercent.textContent = `${safePct.toFixed(1)}%`;
+            progressFill.style.width = `${safePct.toFixed(2)}%`;
+            progressCount.textContent = `${payload.processed_steps || 0}/${payload.total_steps || 0}`;
+            elapsedText.textContent = formatDuration(payload.elapsed_seconds);
+            etaText.textContent = formatDuration(payload.eta_seconds);
+            updatedText.textContent = payload.updated_at || '--';
+            currentFileText.textContent = `Arquivo atual: ${payload.current_file || '-'}`;
+        }
+
+        function stopProgressPolling() {
+            if (progressTimer) {
+                clearInterval(progressTimer);
+                progressTimer = null;
+            }
+        }
+
+        function startProgressPolling(jobId) {
+            stopProgressPolling();
+
+            const poll = async () => {
+                const response = await fetch(`/api/progress/${jobId}`);
+                const payload = await response.json();
+                if (!response.ok || !payload.ok) {
+                    throw new Error(payload.error || 'Falha ao consultar progresso.');
+                }
+
+                updateProgressPanel(payload);
+
+                if (payload.state === 'done') {
+                    stopProgressPolling();
+                    const result = payload.result || {};
+                    const warning = result.errors && result.errors.length
+                        ? ` Arquivos com aviso: ${result.errors.join(', ')}.`
+                        : '';
+                    setResult(
+                        `Concluído com ${result.entries} entradas. XLSX: ${result.xlsx_path}. Dashboard: ${result.dashboard_path}.${warning}`
+                    );
+                    statusText.textContent = 'Processamento concluído.';
+                    goToStep2(result.dashboard_url);
+                    processBtn.disabled = false;
+                    return;
+                }
+
+                if (payload.state === 'error') {
+                    stopProgressPolling();
+                    throw new Error(payload.error || 'Falha no processamento.');
+                }
+            };
+
+            poll().catch((error) => {
+                stopProgressPolling();
+                const message = error instanceof Error ? error.message : String(error);
+                setResult(message, true);
+                statusText.textContent = 'Falha no processamento.';
+                processBtn.disabled = false;
+            });
+
+            progressTimer = setInterval(() => {
+                poll().catch((error) => {
+                    stopProgressPolling();
+                    const message = error instanceof Error ? error.message : String(error);
+                    setResult(message, true);
+                    statusText.textContent = 'Falha no processamento.';
+                    processBtn.disabled = false;
+                });
+            }, 1000);
+        }
+
+        processBtn.addEventListener('click', async () => {
+            const source = currentSource();
+            if (source === 'upload' && !selectedFiles.length) {
+                setResult('Selecione ao menos um arquivo para upload.', true);
+                return;
+            }
+
+            processBtn.disabled = true;
+            statusText.textContent = 'Processando arquivos...';
+            setResult('Execução iniciada. Aguarde o processamento terminar.');
+            progressPanel.style.display = 'block';
+            progressStage.textContent = 'Iniciando processamento...';
+            progressPercent.textContent = '0.0%';
+            progressFill.style.width = '0%';
+            progressCount.textContent = '0/0';
+            elapsedText.textContent = '00:00';
+            etaText.textContent = '--:--';
+            currentFileText.textContent = 'Arquivo atual: -';
+
+            try {
+                const formData = new FormData();
+                formData.append('source', source);
+                selectedFiles.forEach((file) => formData.append('files', file));
+
+                const response = await fetch('/api/process', {
+                    method: 'POST',
+                    body: formData,
+                });
+                const payload = await response.json();
+
+                if (!response.ok || !payload.ok) {
+                    throw new Error(payload.error || 'Falha no processamento.');
+                }
+                if (!payload.job_id) {
+                    throw new Error('Job de processamento não retornado pelo servidor.');
+                }
+
+                startProgressPolling(payload.job_id);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                setResult(message, true);
+                statusText.textContent = 'Falha no processamento.';
+                stopProgressPolling();
+                processBtn.disabled = false;
+            }
+        });
+
+        refreshUploadVisibility();
+
+        // ── Dark / Light mode toggle ──────────────────────────────────────────
+        const themeBtn = document.getElementById('themeBtn');
+        const htmlEl = document.documentElement;
+
+        const savedTheme = localStorage.getItem('stepper-theme');
+        if (savedTheme === 'dark') {
+            htmlEl.classList.add('dark-mode');
+            themeBtn.textContent = '☀️ Claro';
+        }
+
+        themeBtn.addEventListener('click', () => {
+            const isDark = htmlEl.classList.contains('dark-mode');
+            if (isDark) {
+                htmlEl.classList.remove('dark-mode');
+                localStorage.setItem('stepper-theme', 'light');
+                themeBtn.textContent = '🌙 Escuro';
+            } else {
+                htmlEl.classList.add('dark-mode');
+                localStorage.setItem('stepper-theme', 'dark');
+                themeBtn.textContent = '☀️ Claro';
+            }
+        });
+
+        // ── Desligar / shutdown ────────────────────────────────────────────────
+        const shutdownBtn = document.getElementById('shutdownBtn');
+
+        shutdownBtn.addEventListener('click', async () => {
+            if (!confirm('Deseja encerrar a aplicação? O servidor será desligado e esta aba fechada.')) {
+                return;
+            }
+            shutdownBtn.disabled = true;
+            shutdownBtn.textContent = '⏳ Encerrando...';
+            try {
+                await fetch('/api/shutdown', { method: 'POST' });
+            } catch (_) { /* servidor encerrou a conexão — esperado */ }
+            window.close();
+        });
+
+        // ── Nova Sessão / restart ─────────────────────────────────────────────
+        const restartBtn = document.getElementById('restartBtn');
+
+        restartBtn.addEventListener('click', async () => {
+            restartBtn.disabled = true;
+            restartBtn.textContent = '⏳ Reiniciando...';
+            try {
+                await fetch('/api/restart', { method: 'POST' });
+            } catch (_) { /* servidor fechou a conexão — esperado */ }
+            // Aguarda o servidor subir novamente e recarrega
+            const poll = async () => {
+                try {
+                    const r = await fetch('/api/status', { cache: 'no-store' });
+                    if (r.ok) { window.location.reload(); return; }
+                } catch (_) {}
+                setTimeout(poll, 600);
+            };
+            setTimeout(poll, 1500);
+        });
+    </script>
+</body>
+</html>
+"""
