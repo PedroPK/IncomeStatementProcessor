@@ -495,8 +495,10 @@ Quadro 11: "Outros (PLR): R$ 15,980.45"
 ##### **Parser: Avenue Securities** (`parse_avenue`)
 
 **Estrutura do PDF:**
-- Página 1: Informações do beneficiário + saldo em conta
-- Páginas 2-4: Tabelas de ativos (stocks, ETFs)
+- Página 1: Informações do beneficiário + saldo em conta (via regex de texto) **+ tabela de ativos com os primeiros Stocks** (AAPL, AMZN, BRKB)
+- Páginas 2-4: Tabelas de ativos (demais stocks, ETFs)
+
+> ⚠️ **Atenção**: a tabela de ativos começa na **página 1**, não apenas nas páginas seguintes. O saldo em conta é extraído por regex de texto da mesma página.
 
 **Algoritmo:**
 
@@ -505,35 +507,50 @@ Página 1 (texto):
   Regex "(\d{2}-\d{2}) ESTADOS R$ ([\d.]+,\d{2}) R$ ([\d.]+,\d{2})"
   → Extrai saldo conta (06-99)
 
-Páginas 2-4 (tabelas):
+Todas as páginas (tabelas):
   Para cada tabela:
     Para cada linha:
-      Se len(row) >= 9 e row[0] matches \d{2}-\d{2}:
+      Compactar row (remover células None) → compact[]
+      Se compact[0] matches \d{2}-\d{2} e compact[3] é ticker válido:
         → Asset data row
-        Extrai: grupo, código, símbolo, empresa, BRL cost
+        Extrai: grupo, código, compact[3]=símbolo, compact[4]=empresa, BRL cost
       Se row[0] contém "Aplicação Financeira":
         → Rendimento row (next line após asset)
         Regex "Rendimento ou perda: R$ (...)"
         Associa com asset anterior
 ```
 
-**Tratamento Multi-Coluna:**
-- ❌ Problema anterior: Text extraction fragmentado
-- ✅ Solução v1.0: `extract_tables()` produz estrutura limpa
+**Layouts de Tabela (duas variantes):**
 
-**Exemplo de Row Tabela:**
+A tabela da página 1 possui células `None` extras por conta de mesclagem no cabeçalho, resultando em 13 colunas em vez de 9. A compactação normaliza ambos os layouts:
+
+| | Página 1 (13 cols, com `None`) | Páginas 2+ (9 cols) |
+|---|---|---|
+| `row[0]` | `'03-01'` | `'03-01'` |
+| `row[1]` | `'249 - ESTADOS\nUNIDOS'` | `'249 - ESTADOS\nUNIDOS'` |
+| `row[2]` | `None` | `'STOCK'` |
+| `row[3]` | `'STOCK'` | **`'AAPL'`** (Símbolo) |
+| `row[4]` | **`'AAPL'`** (Símbolo) | `'Apple Inc'` (Empresa) |
+| … | … | … |
+| Último | `'R$\n4.472,47'` | `'R$\n4.472,47'` |
+
+Após compactação (`compact = [c for c in row if c is not None]`):
+- `compact[3]` = Símbolo **em ambos os layouts**
+- `compact[4]` = Empresa **em ambos os layouts**
+
+**Validação de Ticker:**
+
+A linha de saldo (`06-99`) também passa pela checagem `re.match(r'(\d{2})-(\d{2})$', cell0)`, mas `compact[3]` contém `'R$ 1.415,92'` (não um ticker). A regex `^[A-Z][A-Z0-9.]{0,14}$` descarta a linha, evitando duplicata com a entrada criada pelo parser de texto.
+
+**Exemplo de Row Tabela (página 1, antes e depois da compactação):**
 ```python
-[
-  '03-01',                          # Grupo-Código
-  '249 - ESTADOS\nUNIDOS',         # Localização
-  'STOCK',                          # Tipo
-  'GOOGL',                          # Símbolo
-  'Alphabet Inc - Class A',         # Empresa
-  '2',                              # Quantidade
-  '$ 373.38',                       # USD cost
-  'R$\n5,3923',                     # Ptax
-  'R$\n2.013,39'                    # BRL cost (31/12/2025)
-]
+# Original (13 colunas)
+['03-01', '249 - ESTADOS\nUNIDOS', None, 'STOCK', 'AAPL', 'Apple Inc', None, '5', None, '$ 858.42', 'R$\n5,2101', None, 'R$\n4.472,47']
+
+# Compactado (9 colunas — idêntico ao layout das páginas 2+)
+['03-01', '249 - ESTADOS\nUNIDOS', 'STOCK', 'AAPL', 'Apple Inc', '5', '$ 858.42', 'R$\n5,2101', 'R$\n4.472,47']
+#                                            ^^^^
+#                                         compact[3] = Símbolo
 ```
 
 ---

@@ -5,6 +5,21 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere a [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.7.1] - 2026-05-27
+
+### 🐛 Corrigido
+
+#### Parser Avenue – AAPL, AMZN e BRKB ausentes na aba IRPF
+- **`parse_avenue()` em `src/parser.py`**: os ativos AAPL, AMZN e BRKB não eram extraídos do PDF da Avenue Securities porque o loop de tabelas usava `pages_tables[1:]`, pulando a página 1 (índice 0) por engano. No entanto, o PDF da Avenue inclui uma tabela de ativos **também na página 1**, contendo exatamente esses três papéis.
+  - **Root cause 1**: o comentário original dizia *"skip page 1 (no asset table)"*, mas a página 1 do relatório anual Avenue contém tanto o saldo em conta (processado via regex de texto) quanto uma tabela de Ações/Stocks com AAPL, AMZN e BRKB.
+  - **Root cause 2**: a tabela da página 1 possui colunas `None` extras intercaladas (células mescladas no cabeçalho), deslocando o índice do Símbolo para a posição 4 em vez de 3, o que quebraria a leitura mesmo se a página fosse processada.
+  - **Fix 1**: `pages_tables[1:]` → `pages_tables` (processa todas as páginas).
+  - **Fix 2**: antes de indexar Símbolo/Empresa, a linha é *compactada* removendo valores `None`: `compact = [c for c in row if c is not None]`. Com isso `compact[3]` = Símbolo e `compact[4]` = Empresa em ambos os layouts.
+  - **Fix 3**: adicionada validação de ticker `re.match(r'^[A-Z][A-Z0-9.]{0,14}$', symbol)` para descartar a linha de saldo (que também tem cell0 `06-99`, mas não possui um ticker válido), evitando entrada duplicada com a já criada pelo parser de texto.
+  - Resultado: total de entradas Avenue passou de 16 → 19 (AAPL R$ 4.472,47 · AMZN R$ 2.286,15 · BRKB R$ 2.515,22 incorporados).
+
+---
+
 ## [1.7.0] - 2026-05-20
 
 ### 🐛 Corrigido
