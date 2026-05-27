@@ -79,10 +79,16 @@ Quatro abas interativas com dados sincronizados com XLSX:
 
 #### Aba 4: Para IRPF
 - **Organização**: Agrupado por Instituição (alfabético)
-- **Estrutura**: Cada instituição em seção própria
-  - Subtabelas agregadas por `(Grupo, Código, Descrição)` — independente de `discriminacao` individual
-  - Linhas com mesma trinca (ex.: múltiplos CDBs do mesmo código) são somadas em uma única linha
-  - Subtotal por instituição em fundo cinza
+- **Estrutura** (v1.7+): Cada instituição em seção própria; dentro de cada seção, as entradas são organizadas em **acordeões por tipo de ativo** (`<details class="irpf-asset-group">`):
+  - Cabeçalho clicável com nome do tipo + total parcial do grupo
+  - Grupos ordenados por valor descendente dentro de cada instituição
+  - Cada grupo exibe as linhas individuais (mantidas separadas por `discriminacao`)
+- **Tipos de ativo reconhecidos automaticamente** (`infer_asset_category()` + `_infer_fixed_income_subtype()`):
+  - `Ações`, `ETFs`, `FIIs`, `Fundos`, `Previdência`
+  - `CDB`, `RDB`, `LCI`, `LCA`, `CRI`, `CRA`, `LCD`, `LIG`, `Debêntures de Infraestrutura`
+  - `Tesouro Selic`, `Tesouro IPCA+`, `Tesouro Prefixado`, `Tesouro Direto`
+  - `Renda Fixa` (fallback para código 04/02-03 sem discriminacao identificável)
+- Subtotal por instituição em fundo cinza
 - **Total Geral**: Resumo consolidado de todas as instituições
 
 ### 4. Responsividade
@@ -144,7 +150,9 @@ src/dashboard_generator.py
     │
     ├─ Extrai dados para JSON:
     │  ├─ Arquivo truncado (40 chars)
-    │  ├─ Instituição, Seção, Grupo, Código, Descrição
+    │  ├─ Instituição, Seção, Grupo, Código, Descrição, Discriminação
+    │  ├─ assetCategory  ← calculado por infer_asset_category(entry)
+    │  ├─ fixedIncomeSubtype  ← calculado por _infer_fixed_income_subtype()
     │  ├─ Valores: v2024, v2025, rendimento, irrf
     │
     ├─ Calcula métricas:
@@ -172,7 +180,11 @@ switchTab(tabName, event)  // Alterna abas ativas
 populateDadosBrutos()    // Cria <tr> para cada entrada
 populateResumo()         // Agrupa por seção + instituição
 populateTotais()         // Agrupa por grupo + código, adiciona total
-populaParaIRPF()         // Seções por instituição com subtotais
+populaParaIRPF()         // Seções por instituição → acordeões por tipo de ativo
+irpfAssetCategory(r)     // Retorna r.assetCategory (calculado em Python)
+irpfDisplayLabel(r)      // Rótulo de exibição: usa r.fixedIncomeSubtype ou r.descricao
+hasToken(d, token)       // Word-boundary match (espelho do _contains_token Python)
+irpfSubtypeFromDiscriminacao(d)  // Deriva subtipo de renda fixa a partir de discriminacao
 ```
 
 #### Inicialização

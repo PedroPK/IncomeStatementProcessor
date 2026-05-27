@@ -5,6 +5,67 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere a [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.7.0] - 2026-05-20
+
+### 🐛 Corrigido
+
+#### Dashboard – Aba "Para IRPF": Categorização de Renda Fixa Nubank com descricao genérica
+- **`_infer_fixed_income_subtype()` em `src/dashboard_generator.py`**: A função concatenava `discriminacao` + `descricao` num único texto e rodava os checks em ordem — `'TESOURO' in text` sendo o primeiro. O `codigo_desc` da Nubank para o código `04/02` é a descrição genérica da seção IRPF: *"Títulos públicos e privados sujeitos à tributação (Tesouro Direto, CDB, RDB e Outros)"*, que contém `"TESOURO"`. Isso fazia **todas** as entradas Nubank desse código retornarem `"Tesouro Direto"`, incluindo CDBs, Debêntures, LCIs e LCAs.
+  - **Root cause**: a estratégia de junção de texto dava peso idêntico ao `codigo_desc` genérico e ao `discriminacao` específico por ativo.
+  - **Fix**: `_infer_fixed_income_subtype` reescrita em duas fases com prioridade explícita:
+    1. **Fase 1 – instrumentos privados**: todos os checks (CDB, RDB, LCI, LCA, CRI, CRA, LCD, LIG, DEB) são executados **exclusivamente sobre `discriminacao`**, sem tocar no `descricao`.
+    2. **Fase 2 – Tesouro Direto**: detectado em `discriminacao` quando ele contém "TESOURO", "SELIC", "LFT", "LTN", "PREFIXADO", NTN, ou o shorthand `"IPCA"` isolado (padrão Nubank para NTN-B). Somente quando `discriminacao` está **ausente** é que `descricao` é consultado para Tesouro.
+  - Resultado verificado no dashboard gerado: 89 CDBs, 8 LCAs, 3 LCIs, 3 Debêntures e 1 Tesouro IPCA+ — todos corretamente separados.
+
+#### Dashboard – Aba "Para IRPF": FIIs da Clear classificados como "Fundos"
+- **`infer_asset_category()` em `src/dashboard_generator.py`**: FIIs custodiados na Clear têm `grupo='07'` e `codigo='02'` (Fundos Imobiliários), mas a branch de ETFs verificava `codigo in {'03', '08'}`, e a branch de Fundos usava `grupo == '07'` como guard geral — nunca alcançando a branch de FIIs para `07/02`.
+  - **Fix**: a branch de FIIs foi antecipada e estendida para capturar `(grupo == '07' and codigo == '02')` explicitamente.
+
+#### Dashboard – Aba "Para IRPF": `CRI` falso-positivo em entradas de Criptoativos
+- **`infer_asset_category()`**: o token `CRI` aparecia como substring de `"CRIPTOATIVOS"` (campo `grupo_desc`), fazendo entradas de crypto serem classificadas como *CRI – Certificado de Recebíveis Imobiliários*.
+  - **Fix**: introduzida função auxiliar `_contains_token(text, token)` com lookbehind/lookahead `(?<![A-Z0-9])TOKEN(?![A-Z0-9])` para garantir que só tokens isolados sejam reconhecidos.
+
+#### Dashboard – Aba "Para IRPF": crash de JavaScript no bloco IRPF
+- Um token inválido (`co`) estava sendo emitido solto no bloco JS da aba "Para IRPF", causando `SyntaxError` em runtime e impedindo a renderização da aba.
+  - **Fix**: removido o token espúrio; bloco JS re-validado.
+
+### ✨ Adicionado
+
+#### Dashboard – Aba "Para IRPF": acordeões por tipo de ativo
+- A aba "Para IRPF" agora organiza as entradas de cada instituição em **grupos por tipo de ativo** (`<details class="irpf-asset-group">`), com cabeçalho clicável para expandir/recolher.
+- Grupos ordenados por valor (maior primeiro): Ações, ETFs, FIIs, Fundos, CDB, LCI, LCA, Debêntures, Tesouro Direto, Renda Fixa, Previdência, etc.
+- Cada grupo exibe o total parcial no cabeçalho.
+
+#### Dashboard – `assetCategory` e `fixedIncomeSubtype` no JSON embarcado
+- Dois novos campos adicionados a cada objeto do `mockData` no HTML:
+  - **`assetCategory`**: string calculada por `infer_asset_category(entry)` em Python no momento da geração — usada como chave de agrupamento nos acordeões.
+  - **`fixedIncomeSubtype`**: string retornada por `_infer_fixed_income_subtype()`, ou `null` — usada como rótulo de exibição dentro do grupo.
+
+#### JavaScript – `hasToken()` para detecção com word-boundary
+- Função JS `hasToken(d, token)` adicionada ao dashboard, espelhando o `_contains_token()` Python: usa regex `(?<![A-Z0-9])TOKEN(?![A-Z0-9])` para evitar falsos positivos em nomes compostos.
+
+### 🧪 Testes
+
+#### `test_asset_category_inference_for_brokers` — 10 novos casos de teste
+Todos os cenários desta sessão foram adicionados à suíte de testes em `src/tests/test_dashboard.py`:
+
+| ID do caso | Situação testada | Resultado esperado |
+|---|---|---|
+| `nubank-cdb-real-descricao` | CDB BANCO MASTER com `codigo_desc` genérico Nubank | `CDB – Certificado de Depósito Bancário` |
+| `nubank-cdb-banco-generico` | `discriminacao='CDB BANCO'` (parcial) | `CDB – Certificado de Depósito Bancário` |
+| `nubank-deb-cemig` | DEB CEMIG com `codigo_desc` genérico Nubank | `Debêntures de Infraestrutura` |
+| `nubank-deb-concessionaria` | DEB CONCESSIONARIA com `codigo_desc` genérico | `Debêntures de Infraestrutura` |
+| `nubank-lci-real` | LCI BANCO BARI com `codigo_desc` genérico | `LCI – Letra de Crédito Imobiliário` |
+| `nubank-lca-real` | LCA BANCO BARI com `codigo_desc` genérico | `LCA – Letra de Crédito do Agronegócio` |
+| `nubank-ipca-tesouro` | `discriminacao='IPCA'` (shorthand Nubank para NTN-B) | `Tesouro IPCA+` |
+| `tesouro-selic-via-discriminacao` | `discriminacao='Tesouro Selic 2027'` | `Tesouro Selic` |
+| `tesouro-prefixado-via-discriminacao` | `discriminacao='Tesouro Prefixado 2029'` | `Tesouro Prefixado` |
+| `clear-fii` | FII `07/02` da Clear (custódia) | `FIIs` |
+
+Casos herdados de sessões anteriores mantidos: `avenue-stock`, `avenue-etf`, `inter-fixed-income`, `nubank-fund`, `xp-fund`, `nubank-cri-not-crypto`, `lca-not-lci`, `debenture-not-lci`, `cdb-not-tesouro`.
+
+---
+
 ## [1.6.0] - 2026-05-18
 
 ### 🐛 Corrigido

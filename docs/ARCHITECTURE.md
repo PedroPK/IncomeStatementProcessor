@@ -287,6 +287,47 @@ Ativos de Renda Fixa com Grupo `04` e Código `02`/`03` são diferenciados por s
 - **Coluna Discriminação**: visível na tabela para facilitar filtragem de ativos específicos
 - **Linha de subtotal** (`<tfoot>`): exibe soma de 2024, 2025 e Rendimento das linhas visíveis (atualizada dinamicamente com os filtros)
 
+**Aba Para IRPF – Acordeões por Tipo de Ativo:**
+
+Cada instituição possui seção própria com grupos por tipo de ativo (`<details class="irpf-asset-group">`). A função Python `infer_asset_category(entry)` e `_infer_fixed_income_subtype()` calculam o grupo no momento da geração do HTML e o embarcam como `assetCategory` e `fixedIncomeSubtype` no JSON `mockData`.
+
+**`infer_asset_category(entry)` — estratégia de prioridade:**
+
+1. **Renda fixa com subtipo identificável**: chama `_infer_fixed_income_subtype(entry.codigo_desc, entry.discriminacao)`. Se retornar algo (ex.: `"CDB – Certificado de Depósito Bancário"`), esse valor é usado diretamente.
+2. **Renda Fixa genérica**: `grupo='04'` e `codigo in {'02','03'}` sem discriminacao específica → `"Renda Fixa"`
+3. **BDRs**: `"BDR"` em texto mesclado → `"BDRs"`
+4. **ETFs**: `grupo='07'` com `codigo in {'03','08'}`, ou `"ETF"` no texto, ou issuer ETF conhecido (iShares, Invesco, etc.) → `"ETFs"`
+5. **FIIs**: `"FII"` no texto, `"FUNDO IMOBILI"`, `grupo='07'/codigo='02'`, ou ticker terminando em `11` → `"FIIs"`
+6. **Fundos**: `grupo='07'` ou `"FUNDO"`/`"MULTIMERCADO"` no texto → `"Fundos"`
+7. **Previdência**: `"VGBL"`/`"PGBL"` ou `grupo='31'` → `"Previdência"`
+8. **Ações**: `"ACAO"`/`"ACOES"`/`"STOCK"` no texto, ou `grupo in {'03','04'}/codigo='01'` (exceto Inter) → `"Ações"`
+9. **Fallback**: `entry.codigo_desc or "Outros ativos"`
+
+**`_infer_fixed_income_subtype(descricao, discriminacao)` — lógica de duas fases:**
+
+> ⚠️ **Regra de prioridade**: o `codigo_desc` (= `descricao`) de corretoras como a Nubank é a descrição genérica da seção IRPF: *"Títulos públicos e privados sujeitos à tributação (Tesouro Direto, CDB, RDB e Outros)"*. Essa string contém `"TESOURO"`, o que tornaria todos os ativos do código `04/02` "Tesouro Direto" se `descricao` fosse consultado no mesmo nível de prioridade que `discriminacao`.
+
+```
+Fase 1 – instrumentos privados (discriminacao apenas):
+  CDB → "CDB – Certificado de Depósito Bancário"
+  RDB → "RDB – Recibo de Depósito Bancário"
+  LCI → "LCI – Letra de Crédito Imobiliário"
+  LCA → "LCA – Letra de Crédito do Agronegócio"
+  CRI → "CRI – Certificado de Recebíveis Imobiliários"   (word-boundary: não casa com CRIPTOATIVOS)
+  CRA → "CRA – Certificado de Recebíveis do Agronegócio"
+  LCD → "LCD – Letra de Câmbio"
+  LIG → "LIG – Letra Imobiliária Garantida"
+  DEB (word-boundary) → "Debêntures de Infraestrutura"
+
+Fase 2 – Tesouro Direto:
+  discriminacao contém TESOURO/SELIC/LFT/LTN/PREFIXADO/NTN/IPCA(bare):
+    + SELIC / LFT   → "Tesouro Selic"
+    + IPCA / NTN-B  → "Tesouro IPCA+"
+    + PREFIXADO/LTN → "Tesouro Prefixado"
+    + (outros)      → "Tesouro Direto"
+  Fallback: discriminacao ausente E descricao contém "TESOURO" → mesma lógica
+```
+
 **Aba Para IRPF – Chave de Agregação:**
 
 | Seção | Chave (Dashboard JS) | Chave (XLSX Python) |
