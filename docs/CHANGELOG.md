@@ -5,6 +5,22 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere a [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.7.3] - 2026-05-27
+
+### ✨ Adicionado
+
+#### Interface Web – Botão "⏹ Desligar"
+- Novo botão **"⏹ Desligar"** no hero da página do stepper, ao lado de "↺ Nova Sessão".
+  - Estilo avermelhado (`background: rgba(220,53,69,0.25)`) para diferenciar visualmente da ação de restart.
+  - Exibe `confirm()` antes de executar para evitar acionamento acidental.
+  - Chama `POST /api/shutdown` e, em seguida, `window.close()` para fechar a aba do navegador.
+- Novo endpoint **`POST /api/shutdown`** em `src/main.py`:
+  - Dispara uma thread com `daemon=False` que envia `SIGTERM` ao processo principal após 0,4 s — o werkzeug intercepta o sinal e encerra o servidor de forma limpa, retornando o prompt ao terminal.
+  - Fallback: caso `SIGTERM` não seja suficiente em 1,5 s, `os._exit(0)` força o encerramento imediato.
+  - Retorna `{ok: true, message: 'Servidor encerrado.'}` antes de sair.
+
+---
+
 ## [1.7.2] - 2026-05-27
 
 ### 🔄 Alterado

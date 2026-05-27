@@ -869,6 +869,9 @@ _STEPPER_HTML_TEMPLATE = """<!DOCTYPE html>
             <button id="restartBtn" title="Encerrar instância atual e iniciar uma nova" style="flex-shrink:0; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.4); backdrop-filter:blur(4px);">
                 ↺ Nova Sessão
             </button>
+            <button id="shutdownBtn" title="Desligar a aplicação e fechar o dashboard" style="flex-shrink:0; background:rgba(220,53,69,0.25); border:1px solid rgba(255,100,100,0.5); backdrop-filter:blur(4px);">
+                ⏹ Desligar
+            </button>
             <button id="themeBtn" title="Alternar modo escuro/claro" style="flex-shrink:0; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.4); backdrop-filter:blur(4px);">
                 🌙 Escuro
             </button>
@@ -1205,6 +1208,21 @@ _STEPPER_HTML_TEMPLATE = """<!DOCTYPE html>
             }
         });
 
+        // ── Desligar / shutdown ────────────────────────────────────────────────
+        const shutdownBtn = document.getElementById('shutdownBtn');
+
+        shutdownBtn.addEventListener('click', async () => {
+            if (!confirm('Deseja encerrar a aplicação? O servidor será desligado e esta aba fechada.')) {
+                return;
+            }
+            shutdownBtn.disabled = true;
+            shutdownBtn.textContent = '⏳ Encerrando...';
+            try {
+                await fetch('/api/shutdown', { method: 'POST' });
+            } catch (_) { /* servidor encerrou a conexão — esperado */ }
+            window.close();
+        });
+
         // ── Nova Sessão / restart ─────────────────────────────────────────────
         const restartBtn = document.getElementById('restartBtn');
 
@@ -1372,6 +1390,22 @@ def _run_web_mode(config: dict) -> None:
     @app.get('/api/status')
     def api_status():
         return jsonify({'ok': True, 'version': __version__})
+
+    @app.post('/api/shutdown')
+    def shutdown_server():
+        """Encerra o servidor de forma limpa."""
+        import signal as _signal
+
+        def _do_shutdown() -> None:
+            time.sleep(0.4)
+            # Envia SIGTERM ao processo principal — werkzeug encerra limpo
+            os.kill(os.getpid(), _signal.SIGTERM)
+            time.sleep(1.5)
+            # Fallback: forçar saída imediata caso SIGTERM não tenha sido suficiente
+            os._exit(0)
+
+        threading.Thread(target=_do_shutdown, daemon=False).start()
+        return jsonify({'ok': True, 'message': 'Servidor encerrado.'})
 
     @app.post('/api/restart')
     def restart_server():
