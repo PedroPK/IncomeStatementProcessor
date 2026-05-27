@@ -1205,41 +1205,8 @@ def _stepper_html() -> str:
         // ── Nova Sessão / restart ─────────────────────────────────────────────
         const restartBtn = document.getElementById('restartBtn');
 
-        async function pollUntilAlive(attempts = 50, intervalMs = 1000) {
-            // Aguarda o servidor cair antes de tentar reconectar
-            await new Promise((resolve) => setTimeout(resolve, 1500));
-            for (let i = 0; i < attempts; i++) {
-                await new Promise((resolve) => setTimeout(resolve, intervalMs));
-                try {
-                    const res = await fetch('/', { cache: 'no-store' });
-                    if (res.ok) return true;
-                } catch (_) {
-                    // server still down – keep polling
-                }
-            }
-            return false;
-        }
-
-        restartBtn.addEventListener('click', async () => {
-            if (!confirm('Encerrar a instância atual e iniciar uma nova sessão?')) return;
-
-            restartBtn.disabled = true;
-            restartBtn.textContent = '↺ Reiniciando...';
-
-            try {
-                await fetch('/api/restart', { method: 'POST' });
-            } catch (_) {
-                // Connection may drop immediately as server restarts – that is expected
-            }
-
-            const alive = await pollUntilAlive();
-            if (alive) {
-                window.location.href = '/';
-            } else {
-                restartBtn.disabled = false;
-                restartBtn.textContent = '↺ Nova Sessão';
-                alert('Servidor não respondeu após reinicialização. Verifique o terminal.');
-            }
+        restartBtn.addEventListener('click', () => {
+            window.location.reload();
         });
     </script>
 </body>

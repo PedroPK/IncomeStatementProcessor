@@ -5,6 +5,17 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere a [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.7.2] - 2026-05-27
+
+### 🔄 Alterado
+
+#### Interface Web – Botão "↺ Nova Sessão"
+- O botão **"↺ Nova Sessão"** agora executa `window.location.reload()` em vez de chamar `/api/restart` e aguardar o servidor reiniciar.
+  - Removido: diálogo de confirmação, chamada `POST /api/restart`, função `pollUntilAlive` e redirect para `/`.
+  - Resultado: refresh imediato na mesma aba, sem interrupção do servidor.
+
+---
+
 ## [1.7.1] - 2026-05-27
 
 ### 🐛 Corrigido
