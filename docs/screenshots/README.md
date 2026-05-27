@@ -1,6 +1,25 @@
 # 📸 Dashboard Screenshots
 
-Este diretório contém screenshots de referência do Dashboard Interativo capturado em tempo real com Playwright. Aqui você encontra visualizações de todas as funcionalidades e estados do dashboard.
+Este diretório contém screenshots de referência do Dashboard Interativo e da Interface Web (tela inicial), capturados em tempo real com Playwright. Aqui você encontra visualizações de todas as funcionalidades e estados da aplicação.
+
+---
+
+## 🚀 Tela Inicial – Card de Boas-Vindas (v1.7.4+)
+
+### Tela Inicial – Tema Claro
+Tela inicial completa (stepper) em tema claro, com o card "O que este aplicativo faz?" visível — apresentando as 3 colunas de feature e os chips de instituições suportadas.
+
+![Tela Inicial – Tema Claro](stepper_about_light.png)
+
+### Tela Inicial – Tema Escuro
+A mesma tela inicial em tema escuro.
+
+![Tela Inicial – Tema Escuro](stepper_about_dark.png)
+
+### Card de Boas-Vindas (detalhe)
+Close no card de boas-vindas com as 3 colunas (Envie seus Informes · Processamento Automático · Dashboard Interativo) e os chips de instituições.
+
+![Card de Boas-Vindas – Detalhe](stepper_about_card.png)
 
 ---
 

@@ -175,5 +175,80 @@ async def take_dashboard_screenshots():
     print("=" * 70 + "\n")
 
 
+async def take_stepper_screenshots():
+    """
+    Generate the stepper/initial-screen HTML and capture screenshots showing
+    the new About Card feature in both light and dark modes.
+
+    Screenshots captured:
+    - stepper_about_light.png  – full initial screen (light mode, about card visible)
+    - stepper_about_dark.png   – full initial screen (dark mode, about card visible)
+    - stepper_about_card.png   – about card element only (light mode)
+    """
+
+    print("\n" + "=" * 70)
+    print("📸 STEPPER INITIAL SCREEN – SCREENSHOT CAPTURE")
+    print("=" * 70 + "\n")
+
+    screenshots_dir = Path('docs/screenshots')
+    screenshots_dir.mkdir(parents=True, exist_ok=True)
+
+    # Render the stepper HTML (no Flask required)
+    print("🔨 Generating stepper HTML...")
+    from src.main import _stepper_html
+    import tempfile
+
+    stepper_path = Path(tempfile.gettempdir()) / 'stepper_temp.html'
+    stepper_path.write_text(_stepper_html(), encoding='utf-8')
+    stepper_url = stepper_path.as_uri()
+    print(f"   ✅ Stepper HTML written: {stepper_path}")
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        page = await browser.new_page(viewport={"width": 1280, "height": 900})
+
+        print(f"\n📱 Opening stepper at {stepper_url}")
+        await page.goto(stepper_url, wait_until='domcontentloaded')
+        await page.wait_for_timeout(400)
+
+        # Ensure about card is always visible for the screenshot
+        await page.evaluate('() => { localStorage.removeItem("aboutDismissed"); '
+                            'const c = document.getElementById("aboutCard"); '
+                            'if (c) c.style.display = ""; }')
+        await page.wait_for_timeout(200)
+
+        # ── Light mode ──────────────────────────────────────────────────────
+        print("\n💡 Light mode...")
+        await page.evaluate('() => document.documentElement.classList.remove("dark-mode")')
+        await page.wait_for_timeout(300)
+
+        path = screenshots_dir / 'stepper_about_light.png'
+        await page.screenshot(path=str(path), full_page=True)
+        print(f"   ✅ Full page (light): {path}")
+
+        # About card element only
+        about_card = await page.query_selector('#aboutCard')
+        if about_card:
+            path = screenshots_dir / 'stepper_about_card.png'
+            await about_card.screenshot(path=str(path))
+            print(f"   ✅ About card only: {path}")
+
+        # ── Dark mode ───────────────────────────────────────────────────────
+        print("\n🌙 Dark mode...")
+        await page.evaluate('() => document.documentElement.classList.add("dark-mode")')
+        await page.wait_for_timeout(300)
+
+        path = screenshots_dir / 'stepper_about_dark.png'
+        await page.screenshot(path=str(path), full_page=True)
+        print(f"   ✅ Full page (dark): {path}")
+
+        await browser.close()
+
+    print("\n" + "=" * 70)
+    print("✅ Stepper screenshots saved to: docs/screenshots")
+    print("=" * 70 + "\n")
+
+
 if __name__ == '__main__':
     asyncio.run(take_dashboard_screenshots())
+    asyncio.run(take_stepper_screenshots())

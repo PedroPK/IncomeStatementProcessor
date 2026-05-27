@@ -594,6 +594,133 @@ _STEPPER_HTML_TEMPLATE = """<!DOCTYPE html>
             opacity: 0.9;
         }
 
+        .about-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 18px 20px 16px;
+            margin-bottom: 18px;
+            box-shadow: 0 4px 16px rgba(11, 23, 61, 0.05);
+        }
+
+        .about-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+
+        .about-card-header h2 {
+            margin: 0;
+            font-size: 1rem;
+            color: var(--text);
+        }
+
+        .about-dismiss {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--muted);
+            font-size: 0.82rem;
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 400;
+        }
+
+        .about-dismiss:hover {
+            background: var(--border);
+        }
+
+        .about-cols {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        @media (max-width: 640px) {
+            .about-cols { grid-template-columns: 1fr; }
+        }
+
+        .about-col {
+            background: #f8faff;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 14px;
+            text-align: center;
+        }
+
+        html.dark-mode .about-col {
+            background: #151928;
+        }
+
+        .about-col .icon {
+            font-size: 1.7rem;
+            margin-bottom: 6px;
+        }
+
+        .about-col strong {
+            display: block;
+            font-size: 0.92rem;
+            margin-bottom: 4px;
+            color: var(--text);
+        }
+
+        .about-col p {
+            margin: 0;
+            font-size: 0.82rem;
+            color: var(--muted);
+            line-height: 1.45;
+        }
+
+        .about-arrow {
+            display: none;
+        }
+
+        @media (min-width: 641px) {
+            .about-arrow {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: var(--muted);
+                font-size: 1.2rem;
+            }
+        }
+
+        .about-institutions {
+            font-size: 0.82rem;
+            color: var(--muted);
+            border-top: 1px solid var(--border);
+            padding-top: 10px;
+        }
+
+        .about-institutions strong {
+            color: var(--text);
+        }
+
+        .inst-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 6px;
+        }
+
+        .inst-chip {
+            background: #eef1fb;
+            border: 1px solid #d0d8f5;
+            border-radius: 20px;
+            padding: 2px 10px;
+            font-size: 0.8rem;
+            color: #4f46e5;
+            font-weight: 600;
+        }
+
+        html.dark-mode .inst-chip {
+            background: #1e2a4a;
+            border-color: #3b4d7a;
+            color: #93a8f5;
+        }
+
         .stepper {
             display: flex;
             gap: 12px;
@@ -877,6 +1004,45 @@ _STEPPER_HTML_TEMPLATE = """<!DOCTYPE html>
             </button>
         </div>
 
+        <div class="about-card" id="aboutCard">
+            <div class="about-card-header">
+                <h2>🚀 O que este aplicativo faz?</h2>
+                <button class="about-dismiss" id="aboutDismiss" title="Não mostrar novamente">Não mostrar novamente</button>
+            </div>
+
+            <div class="about-cols">
+                <div class="about-col">
+                    <div class="icon">📂</div>
+                    <strong>Envie seus Informes</strong>
+                    <p>Arraste PDFs ou ZIPs com os Informes de Rendimentos emitidos pelas suas instituições financeiras.</p>
+                </div>
+                <div class="about-col">
+                    <div class="icon">⚙️</div>
+                    <strong>Processamento Automático</strong>
+                    <p>A aplicação extrai, normaliza e consolida todos os valores automaticamente — sem intervenção manual.</p>
+                </div>
+                <div class="about-col">
+                    <div class="icon">📊</div>
+                    <strong>Dashboard Interativo</strong>
+                    <p>Receba um relatório visual completo com gráficos, tabelas e exportação para Excel prontos para o IRPF.</p>
+                </div>
+            </div>
+
+            <div class="about-institutions">
+                <strong>Instituições suportadas:</strong>
+                <div class="inst-chips">
+                    <span class="inst-chip">Accenture</span>
+                    <span class="inst-chip">Avenue Securities</span>
+                    <span class="inst-chip">Clear</span>
+                    <span class="inst-chip">Inter</span>
+                    <span class="inst-chip">NuBank</span>
+                    <span class="inst-chip">XP Investimentos</span>
+                    <span class="inst-chip">XP Vida e Previdência</span>
+                    <span class="inst-chip">+ XLSX de custódia</span>
+                </div>
+            </div>
+        </div>
+
         <div class="stepper">
             <div class="step active" id="stepIndicator1">
                 <span class="step-index">1</span>
@@ -955,6 +1121,19 @@ _STEPPER_HTML_TEMPLATE = """<!DOCTYPE html>
     </div>
 
     <script>
+        // ── About card visibility ─────────────────────────────────────────────
+        (function () {
+            const card = document.getElementById('aboutCard');
+            const btn  = document.getElementById('aboutDismiss');
+            if (localStorage.getItem('aboutDismissed') === '1') {
+                card.style.display = 'none';
+            }
+            btn.addEventListener('click', function () {
+                card.style.display = 'none';
+                localStorage.setItem('aboutDismissed', '1');
+            });
+        })();
+
         let selectedFiles = [];
         let progressTimer = null;
 

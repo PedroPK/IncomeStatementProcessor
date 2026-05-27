@@ -945,6 +945,38 @@ def test_dashboard_dark_mode():
         return True
 
 
+def test_stepper_about_card():
+    """Test that the stepper initial screen contains the about card with all expected elements."""
+    print("🧪 Test: Stepper About Card")
+
+    from src.main import _stepper_html
+
+    html = _stepper_html()
+
+    # Card container
+    assert 'id="aboutCard"' in html, "aboutCard element missing"
+    assert 'id="aboutDismiss"' in html, "aboutDismiss button missing"
+
+    # 3 feature columns
+    assert 'Envie seus Informes' in html, "Feature column 'Envie seus Informes' missing"
+    assert 'Processamento Autom' in html, "Feature column 'Processamento Automático' missing"
+    assert 'Dashboard Interativo' in html, "Feature column 'Dashboard Interativo' missing"
+
+    # Institution chips
+    for institution in ('Avenue Securities', 'Clear', 'Inter', 'NuBank', 'XP Investimentos'):
+        assert institution in html, f"Institution chip '{institution}' missing"
+
+    # localStorage dismiss logic
+    assert 'aboutDismissed' in html, "localStorage key 'aboutDismissed' missing"
+    assert "localStorage.setItem('aboutDismissed'" in html, "dismiss setItem call missing"
+
+    print("  ✅ aboutCard element present")
+    print("  ✅ All 3 feature columns present")
+    print("  ✅ All institution chips present")
+    print("  ✅ localStorage dismiss logic present")
+    return True
+
+
 def run_all_tests():
     """Run all dashboard tests."""
     print("\n" + "=" * 70)
@@ -963,6 +995,7 @@ def run_all_tests():
         test_dashboard_all_institutions,
         test_dashboard_section_aggregation,
         test_dashboard_dark_mode,
+        test_stepper_about_card,
     ]
     
     results = []

@@ -98,6 +98,48 @@ Quatro abas interativas com dados sincronizados com XLSX:
 - **Desktop**: Layout completo com 4 cards + 2 charts lado a lado
 - **Bootstrap 5.3**: Grid system 12 colunas
 
+## 🌐 Interface Web – Tela Inicial (Stepper)
+
+A aplicação é iniciada com `python3 -m src.main` e abre automaticamente uma interface web local. A **tela inicial** (stepper) guia o usuário pelo fluxo em dois passos.
+
+### Card de Boas-Vindas ("O que este aplicativo faz?")
+
+Exibido na primeira visita, o card explica a proposta de valor da ferramenta em 3 colunas visuais:
+
+| Coluna | Título | Descrição |
+|--------|--------|-----------|
+| 📂 | **Envie seus Informes** | Arraste PDFs ou ZIPs com os Informes de Rendimentos emitidos pelas suas instituições financeiras. |
+| ⚙️ | **Processamento Automático** | A aplicação extrai, normaliza e consolida todos os valores automaticamente — sem intervenção manual. |
+| 📊 | **Dashboard Interativo** | Receba um relatório visual completo com gráficos, tabelas e exportação para Excel prontos para o IRPF. |
+
+Abaixo das colunas, **chips de instituições suportadas** listam: Accenture · Avenue Securities · Clear · Inter · NuBank · XP Investimentos · XP Vida e Previdência · + XLSX de custódia.
+
+O botão **"Não mostrar novamente"** persiste a preferência em `localStorage` para que usuários recorrentes vejam a tela limpa diretamente.
+
+#### Screenshots
+
+| Tema Claro | Tema Escuro |
+|:---:|:---:|
+| ![Tela Inicial – Tema Claro](./screenshots/stepper_about_light.png) | ![Tela Inicial – Tema Escuro](./screenshots/stepper_about_dark.png) |
+
+Card em detalhe:
+
+![Card de Boas-Vindas](./screenshots/stepper_about_card.png)
+
+### Passo 1 – Selecionar Fonte e Processar
+
+O usuário escolhe entre:
+- **Usar arquivos da pasta `input/`** — detecta automaticamente o primeiro ZIP presente.
+- **Arrastar PDF(s) ou ZIP(s)** — dropzone com suporte a múltiplos arquivos (`.pdf`, `.zip`, `.aspx`, `.asp`, `.xlsx`, `.xls`).
+
+Após clicar em **Processar**, um painel de progresso exibe: estágio atual, percentual, arquivos concluídos, tempo decorrido e ETA.
+
+### Passo 2 – Visualizar Dashboard
+
+O dashboard gerado é exibido em um `<iframe>` que ocupa praticamente toda a viewport, permitindo navegação completa sem sair da tela.
+
+---
+
 ## 📸 Visualizações
 
 ### Tema Claro (Light Mode)

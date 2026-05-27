@@ -5,6 +5,30 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere a [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.7.4] - 2026-05-27
+
+### ✨ Adicionado
+
+#### Interface Web – Card "O que este aplicativo faz?" na tela inicial
+- Novo **card de boas-vindas** (`#aboutCard`) exibido entre o cabeçalho (hero) e os indicadores de passo na tela inicial do stepper (`_STEPPER_HTML_TEMPLATE` em `src/main.py`).
+  - **3 colunas visuais** descrevendo o fluxo completo:
+    - 📂 *Envie seus Informes* — PDFs/ZIPs com os Informes de Rendimentos.
+    - ⚙️ *Processamento Automático* — extração, normalização e consolidação de dados.
+    - 📊 *Dashboard Interativo* — relatório visual com gráficos, tabelas e exportação Excel.
+  - **Chips de instituições suportadas** listando Accenture, Avenue Securities, Clear, Inter, NuBank, XP Investimentos, XP Vida e Previdência e "+ XLSX de custódia".
+  - **Botão "Não mostrar novamente"** (`#aboutDismiss`): oculta o card e persiste a preferência em `localStorage` (`aboutDismissed = '1'`). Usuários recorrentes não veem o card nas sessões seguintes.
+- CSS dedicado (`.about-card`, `.about-cols`, `.about-col`, `.inst-chips`, `.inst-chip`) com suporte completo a modo escuro via variáveis CSS.
+- Screenshots de documentação adicionadas:
+  - `docs/screenshots/stepper_about_light.png` — tela inicial (tema claro).
+  - `docs/screenshots/stepper_about_dark.png` — tela inicial (tema escuro).
+  - `docs/screenshots/stepper_about_card.png` — card de boas-vindas em detalhe.
+
+### 🧪 Testes
+- `test_stepper_about_card()` em `src/tests/test_dashboard.py`: verifica presença do `#aboutCard`, do botão `#aboutDismiss`, das 3 colunas de feature, dos chips de instituição e da lógica `localStorage`.
+- `take_stepper_screenshots()` em `src/tests/test_dashboard_screenshots.py`: captura com Playwright as 3 screenshots da tela inicial (light, dark, card isolado).
+
+---
+
 ## [1.7.3] - 2026-05-27
 
 ### ✨ Adicionado
