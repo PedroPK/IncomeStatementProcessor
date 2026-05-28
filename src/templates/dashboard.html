@@ -502,6 +502,56 @@
             border-top: 1px solid var(--border-light);
             padding-top: 20px;
         }
+
+        /* ── Summary section collapsible ──────────────────────────────────── */
+        .summary-section {
+            border: 1px solid var(--border-light);
+            border-radius: 10px;
+            background: var(--bg-light-card);
+            margin-bottom: 1.5rem;
+            overflow: hidden;
+        }
+
+        .summary-section > summary {
+            list-style: none;
+            cursor: pointer;
+            padding: 14px 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 14px;
+            background: rgba(102, 126, 234, 0.08);
+            border-bottom: 1px solid transparent;
+            user-select: none;
+        }
+
+        .summary-section[open] > summary {
+            border-bottom-color: var(--border-light);
+        }
+
+        .summary-section > summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .summary-section > summary::after {
+            content: '▾';
+            font-size: 1rem;
+            color: var(--primary-color);
+        }
+
+        .summary-section[open] > summary::after {
+            content: '▴';
+        }
+
+        .summary-section-title {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--primary-color);
+        }
+
+        .summary-section-body {
+            padding: 16px;
+        }
     </style>
 </head>
 <body>
@@ -559,53 +609,64 @@
         {% endif %}
 
 
-        <!-- Key Metrics -->
-        <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="card metric-card">
-                    <div class="metric-value">{{ total_2024_fmt }}</div>
-                    <div class="metric-label">Total 2024</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card metric-card">
-                    <div class="metric-value">{{ total_2025_fmt }}</div>
-                    <div class="metric-label">Total 2025</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card metric-card">
-                    <div class="metric-value">{{ total_rendimento_fmt }}</div>
-                    <div class="metric-label">Rendimentos</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card metric-card">
-                    <div class="metric-value">{{ entry_count }}</div>
-                    <div class="metric-label">Entradas Processadas</div>
-                </div>
-            </div>
-        </div>
+        <!-- Collapsible Summary Section: Key Metrics + Charts -->
+        <details class="summary-section">
+            <summary>
+                <span class="summary-section-title">📊 Totalizadores e Gráficos</span>
+                <span style="font-size:0.85rem; color:var(--text-muted);">clique para expandir</span>
+            </summary>
+            <div class="summary-section-body">
 
-        <!-- Charts Row -->
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <div class="card p-3">
-                    <h6 class="card-title">Distribuição por Instituição (2025)</h6>
-                    <div class="chart-container">
-                        <canvas id="chartInstitution"></canvas>
+                <!-- Key Metrics -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card metric-card">
+                            <div class="metric-value">{{ total_2024_fmt }}</div>
+                            <div class="metric-label">Total 2024</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card metric-card">
+                            <div class="metric-value">{{ total_2025_fmt }}</div>
+                            <div class="metric-label">Total 2025</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card metric-card">
+                            <div class="metric-value">{{ total_rendimento_fmt }}</div>
+                            <div class="metric-label">Rendimentos</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card metric-card">
+                            <div class="metric-value">{{ entry_count }}</div>
+                            <div class="metric-label">Entradas Processadas</div>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card p-3">
-                    <h6 class="card-title">Evolução 2024 → 2025</h6>
-                    <div class="chart-container">
-                        <canvas id="chartEvolution"></canvas>
+
+                <!-- Charts Row -->
+                <div class="row mb-2">
+                    <div class="col-md-6">
+                        <div class="card p-3">
+                            <h6 class="card-title">Distribuição por Instituição (2025)</h6>
+                            <div class="chart-container">
+                                <canvas id="chartInstitution"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card p-3">
+                            <h6 class="card-title">Evolução 2024 → 2025</h6>
+                            <div class="chart-container">
+                                <canvas id="chartEvolution"></canvas>
+                            </div>
+                        </div>
                     </div>
                 </div>
+
             </div>
-        </div>
+        </details>
 
         <!-- Tabs Section -->
         <div class="card">
@@ -1522,10 +1583,23 @@
         }
 
         // Initialize
+        let _chartsCreated = false;
+
         window.addEventListener('DOMContentLoaded', function() {
             initializeTheme();
             populateTabs();
-            createCharts();
+
+            // Create charts lazily when the summary section is first opened,
+            // so Chart.js can measure the canvas dimensions correctly.
+            const summarySection = document.querySelector('.summary-section');
+            if (summarySection) {
+                summarySection.addEventListener('toggle', function() {
+                    if (summarySection.open && !_chartsCreated) {
+                        _chartsCreated = true;
+                        createCharts();
+                    }
+                });
+            }
         });
     </script>
 </body>
