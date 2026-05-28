@@ -762,6 +762,11 @@
 
                 <!-- Tab 4: Para IRPF -->
                 <div id="para-irpf" class="tab-content">
+                    <div class="d-flex justify-content-end mb-2">
+                        <button id="btn-toggle-irpf" class="btn btn-sm" style="background:rgba(102,126,234,0.15);border:1px solid var(--primary-color);color:var(--primary-color);" onclick="toggleAllIRPFInstitutions()">
+                            ▾ Recolher tudo
+                        </button>
+                    </div>
                     <div id="irpf-content"></div>
                 </div>
             </div>
@@ -856,6 +861,15 @@
                 style: 'currency',
                 currency: 'BRL'
             }).format(value);
+        }
+
+        // IRPF: collapse / expand all institution groups
+        function toggleAllIRPFInstitutions() {
+            const groups = document.querySelectorAll('#irpf-content .irpf-institution-group');
+            const btn = document.getElementById('btn-toggle-irpf');
+            const anyOpen = Array.from(groups).some(g => g.open);
+            groups.forEach(g => { g.open = !anyOpen; });
+            btn.textContent = anyOpen ? '▾ Expandir tudo' : '▾ Recolher tudo';
         }
 
         // Tab Switching
