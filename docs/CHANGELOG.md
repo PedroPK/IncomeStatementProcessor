@@ -5,6 +5,26 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere a [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.7.7] - 2026-05-28
+
+### 🐛 Corrigido
+
+#### Parser NuBank – nomes de banco truncados quando quebrados em duas linhas
+- O PDF da NuBank formata nomes longos de emissores em duas linhas (ex: `CDB BANCO` / `RENDIMENTO`, `CDB PERNAMBUCANAS` / `FINANCIADORA S/A CFI`, `LCA BANCO BTG` / `PACTUAL`). O parser capturava apenas a primeira parte, gerando discriminações incompletas.
+- **Correção em `src/parser.py`:**
+  - Adicionado `_NUBANK_CONT_SKIP_RE` — regex que identifica linhas que **não** são continuação de nome (contêm `R$`, datas, `Total:`, cabeçalhos de seção, etc.).
+  - No loop de `_NUBANK_ROW_RE`, após extrair `desc`, a linha imediatamente seguinte ao dado é inspecionada: se for **toda em maiúsculas** e não casar com `_NUBANK_CONT_SKIP_RE`, é concatenada ao nome como continuação.
+  - O critério de maiúsculas evita que frases explicativas em caixa mista (ex: "Dúvidas frequentes sobre declaração…") sejam indevidamente anexadas.
+- Exemplos de discriminações antes e depois:
+
+  | Antes | Depois |
+  |---|---|
+  | `CDB BANCO` | `CDB BANCO RENDIMENTO` |
+  | `CDB PERNAMBUCANAS` | `CDB PERNAMBUCANAS FINANCIADORA S/A CFI` |
+  | `LCA BANCO BTG` | `LCA BANCO BTG PACTUAL` |
+
+---
+
 ## [1.7.6] - 2026-05-28
 
 ### 🐛 Corrigido

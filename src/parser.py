@@ -912,6 +912,12 @@ _NUBANK_CRYPTO_ROW_RE = re.compile(
     r'[\d.]+\s+R\$\s*([\d.]+,\d{2})\s+'  # qty2024 cost2024
     r'[\d.]+\s+R\$\s*([\d.]+,\d{2})',    # qty2025 cost2025
 )
+# Matches content that disqualifies a line from being a wrapped name continuation.
+# A continuation line is pure text — no monetary values, no dates, no section headers.
+_NUBANK_CONT_SKIP_RE = re.compile(
+    r'R\$|\d{2}/\d{2}/\d{4}|Total:|Grupo\s+\d+|Código\s+\d+'
+    r'|CNPJ:|Fonte pagadora:|Localização|Título\s+Vencimento'
+)
 
 
 def parse_nubank(filename: str, pages_text: list[str],
@@ -960,12 +966,24 @@ def parse_nubank(filename: str, pages_text: list[str],
         # Standard rows (date-anchored) – capture description from line prefix
         for m in _NUBANK_ROW_RE.finditer(block):
             line_start = block.rfind('\n', 0, m.start()) + 1
-            line = block[line_start:block.find('\n', m.start())]
+            line_end = block.find('\n', m.start())
+            line = block[line_start:line_end if line_end != -1 else len(block)]
             if 'Total:' in line or '31/12' in line:
                 continue
             raw_desc = re.sub(r'\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}\s*', '',
                                block[line_start:m.start()])
             desc = clean(raw_desc) or codigo_desc
+            # Some PDFs wrap long bank names onto the next line (e.g. "CDB BANCO\nRENDIMENTO").
+            # A valid continuation is ALL-CAPS (bank names in NuBank PDFs are uppercase)
+            # and contains no monetary values, dates, or section headers.
+            if line_end != -1:
+                next_start = line_end + 1
+                next_end = block.find('\n', next_start)
+                next_line = block[next_start: next_end if next_end != -1 else len(block)].strip()
+                if (next_line
+                        and next_line == next_line.upper()
+                        and not _NUBANK_CONT_SKIP_RE.search(next_line)):
+                    desc = f"{desc} {next_line}".strip() if desc else next_line
             row_data.append((desc, parse_brl(m.group(1)), parse_brl(m.group(2)),
                              parse_brl(m.group(3)) if m.group(3) else 0.0))
 
