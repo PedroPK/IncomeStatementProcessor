@@ -376,7 +376,7 @@ O modo padrão (`python3 -m src.main`) inicia um servidor Flask local e abre o n
 | `GET` | `/dashboard` | Serve o dashboard HTML gerado |
 | `POST` | `/api/process` | Inicia pipeline (form-data: `source`, `files[]`) → retorna `{ok, job_id}` |
 | `GET` | `/api/progress/<job_id>` | Polling de progresso → retorna estado/percentual/ETA do job |
-| `POST` | `/api/restart` | Reinicia o processo servidor (`os.execv`) → retorna `{ok: true}` |
+| `POST` | `/api/restart` | Lança novo processo filho com `--no-browser` e encerra o atual (`os._exit`) → retorna `{ok: true}` |
 | `POST` | `/api/shutdown` | Encerra o servidor via `SIGTERM` (fallback: `os._exit`) → retorna `{ok: true}` |
 
 #### Página do Stepper (`_stepper_html()`)
@@ -392,7 +392,9 @@ O modo padrão (`python3 -m src.main`) inicia um servidor Flask local e abre o n
 - Persistência via `localStorage('stepper-theme')`
 
 **Botão "↺ Nova Sessão":**
-- Executa `window.location.reload()` para recarregar a UI sem reiniciar o servidor
+- Chama `POST /api/restart`; o servidor reinicia o processo com `--no-browser` (sem abrir nova aba)
+- A aba atual faz polling de `GET /api/status` (a cada 600 ms) e executa `window.location.reload()` ao detectar o servidor disponível
+- Resultado: apenas a aba existente é recarregada — nenhuma aba extra é aberta
 
 **Botão "⏹ Desligar":**
 - Exibe `confirm()` antes de executar

@@ -5,6 +5,20 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere a [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.7.6] - 2026-05-28
+
+### 🐛 Corrigido
+
+#### Interface Web – "Nova Sessão" não abre aba duplicada no navegador
+- Ao clicar em **"↺ Nova Sessão"**, o processo servidor reiniciava e chamava `webbrowser.open()` novamente, abrindo uma segunda aba enquanto a aba original permanecia aberta com a sessão antiga.
+- **Correção em `src/main.py`:**
+  - `restart_server()` passa `--no-browser` como argumento extra ao processo filho; flags duplicadas são deduplicadas antes de serem repassadas.
+  - `_run_web_mode()` verifica `--no-browser` em `sys.argv` e pula a chamada `webbrowser.open()` quando presente.
+  - `main()` filtra `--no-browser` (junto com `--cli`) antes de inferir o caminho do config, evitando que seja interpretado como arquivo de configuração.
+- A aba original realiza polling de `GET /api/status` a cada 600 ms e executa `window.location.reload()` ao detectar o servidor no ar — resultando em exatamente uma aba aberta após o restart.
+
+---
+
 ## [1.7.5] - 2026-05-27
 
 ### ♻️ Refatorado

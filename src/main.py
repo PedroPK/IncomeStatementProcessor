@@ -707,8 +707,11 @@ def _run_web_mode(config: dict) -> None:
         def _do_restart() -> None:
             # Aguarda o response chegar ao cliente antes de matar o processo
             time.sleep(1.2)
+            # --no-browser evita que o novo processo abra uma aba extra;
+            # a aba atual já irá recarregar via polling.
+            restart_args = [a for a in extra_args if a != '--no-browser'] + ['--no-browser']
             subprocess.Popen(
-                [sys.executable, '-m', 'src.main'] + extra_args,
+                [sys.executable, '-m', 'src.main'] + restart_args,
                 cwd=project_root,
             )
             # Força saída imediata sem cleanup para liberar o socket
@@ -763,16 +766,17 @@ def _run_web_mode(config: dict) -> None:
     print(f'Interface web iniciada em {web_url}')
     print('Use --cli para o comportamento anterior (processar input/ diretamente).')
 
-    try:
-        webbrowser.open(web_url)
-    except Exception:  # noqa: BLE001
-        pass
+    if '--no-browser' not in sys.argv:
+        try:
+            webbrowser.open(web_url)
+        except Exception:  # noqa: BLE001
+            pass
 
     app.run(host=host, port=port, debug=False, threaded=True)
 
 
 def main() -> None:
-    args = [arg for arg in sys.argv[1:] if arg != '--cli']
+    args = [arg for arg in sys.argv[1:] if arg not in ('--cli', '--no-browser')]
     cfg_path = args[0] if args else 'config.toml'
     config = load_config(cfg_path)
 
