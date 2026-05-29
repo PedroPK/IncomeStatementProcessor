@@ -137,10 +137,31 @@ def extract_taxpayer_info(text: str) -> tuple[str, str]:
             break
 
     # ── Step 2: Extract Name from first 25 lines ─────────────────────────────
+    # Early pass: "NOME COMPLETO:" (RFB Comprovante de Rendimentos format)
+    # Must run before line loop so Pattern B on a CPF-bearing line doesn't win.
+    m_nc = re.search(r'NOME COMPLETO:\s*(.+?)(?:\s+MATR[IÍ]CULA\b|\s*$)',
+                     text, re.IGNORECASE | re.MULTILINE)
+    if m_nc:
+        candidate = clean(m_nc.group(1)).strip()
+        # Reject header labels (e.g. "Uso Interno:") — real names never have colons
+        if ':' not in candidate and _is_valid_name(candidate, 0.6):
+            nome = candidate
+
     for i, line in enumerate(lines[:25]):
+        if nome:
+            break
         s = line.strip()
         if not s or len(s) < 3:
             continue
+
+        # Pattern A0: "NOME COMPLETO:<name> MATRÍCULA:..." (RFB Comprovante format)
+        m = re.search(r'NOME COMPLETO:\s*(.+?)(?:\s+MATR[IÍ]CULA\b|\s*$)', s, re.IGNORECASE)
+        if m:
+            candidate = clean(m.group(1)).strip()
+            # Reject header labels (e.g. "Uso Interno:") — real names never have colons
+            if ':' not in candidate and _is_valid_name(candidate, 0.6):
+                nome = candidate
+                break
 
         # Pattern A: "Nome : <name>" or "Nome: <name>" (Avenue style)
         m = re.search(r'[Nn]ome\s*:\s*(.+?)(?:\s*$)', s)

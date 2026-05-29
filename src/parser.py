@@ -45,6 +45,12 @@ def detect_institution(filename: str, first_page: str) -> str:
         return 'fachesf'
     if 'inss' in fname or 'regime geral de previdencia' in text or 'frgps' in text:
         return 'inss'
+    # Generic Receita Federal "Comprovante de Rendimentos" format
+    # (used by pension funds and employers following the Ministry of Finance template)
+    if 'comprovante de rendimentos' in text and (
+        'razão social / nome' in text or 'razao social / nome' in text
+    ):
+        return 'comprovante_rendimentos'
     return 'unknown'
 
 
@@ -98,6 +104,7 @@ def parse_file(filepath: str) -> list[Entry]:
         'clear': parse_clear,
         'fachesf': parse_fachesf,
         'inss': parse_inss,
+        'comprovante_rendimentos': parse_comprovante_rendimentos,
     }
 
     parser_fn = parsers.get(institution)
@@ -1407,6 +1414,123 @@ def parse_inss(filename: str, pages_text: list[str],
             rendimento=outros_is, tipo_rendimento='Isento')
 
     # If nothing was extracted, still return an entry to confirm parsing
+    if not entries:
+        add('Rendimentos Tributáveis PJ', '', 'Proventos de Aposentadoria/Pensão',
+            '01', 'Total dos Rendimentos (zerado)',
+            valor_2025=0.0, tipo_rendimento='Tributável')
+
+    return entries
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# COMPROVANTE DE RENDIMENTOS  (Receita Federal standard – pension funds / employers)
+# Format: Ministério da Fazenda / Secretaria da Receita Federal template with
+# numbered quadros 1–7 and "RAZÃO SOCIAL / NOME:" field.
+# Used by NPS/Funame, SPSM, and other pension funds that follow this template.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def parse_comprovante_rendimentos(filename: str, pages_text: list[str],
+                                   pages_tables: list[list]) -> list[Entry]:
+    """Parse the standard RFB 'Comprovante de Rendimentos' multi-quadro format."""
+    text = '\n'.join(pages_text)
+    entries: list[Entry] = []
+
+    # ── Institution & year ───────────────────────────────────────────────────
+    cnpj_m = re.search(
+        r'CNPJ:\s*(\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2})\s+RAZ[ÃA]O SOCIAL\s*/\s*NOME:\s*(.+)',
+        text, re.IGNORECASE,
+    )
+    cnpj = cnpj_m.group(1) if cnpj_m else find_cnpj(text)
+    inst = clean(cnpj_m.group(2)) if cnpj_m else 'Previdência'
+
+    ano_m = re.search(r'ANO CALEND[ÁA]RIO:\s*(\d{4})', text, re.IGNORECASE)
+    ano = int(ano_m.group(1)) if ano_m else extract_year(text)
+
+    def add(secao: str, grupo: str, gdesc: str, codigo: str, cdesc: str, **kw) -> None:
+        entries.append(_entry(filename, inst, cnpj, ano,
+                               secao, grupo, gdesc, codigo, cdesc,
+                               fonte_pagadora=inst, cnpj_fonte=cnpj, **kw))
+
+    def _section(start_pat: str, end_pat: str) -> str:
+        """Slice text between two section-header patterns."""
+        s = re.search(start_pat, text, re.IGNORECASE)
+        if not s:
+            return ''
+        e = re.search(end_pat, text[s.end():], re.IGNORECASE)
+        end_pos = s.end() + e.start() if e else len(text)
+        return text[s.start():end_pos]
+
+    def _val_in(block: str, item_num: int) -> float:
+        """Extract the BRL value for a numbered item (same-line or next-line).
+
+        Uses a space separator before the value so backtracking anchors to the
+        last number on the line rather than the shortest suffix (e.g. captures
+        '45.085,56' not just '5,56').
+        """
+        # Value at end of line, separated from description by a space
+        m = re.search(
+            rf'0?{item_num}\s*[-–][^\n]* ([\d.]+,\d{{2}})\s*$',
+            block, re.IGNORECASE | re.MULTILINE,
+        )
+        if m:
+            return parse_brl(m.group(1))
+        # Wrapped: description spans to next line, value is on the line below
+        m = re.search(
+            rf'0?{item_num}\s*[-–]\s*[^\n]*\n([\d.]+,\d{{2}})',
+            block, re.IGNORECASE,
+        )
+        return parse_brl(m.group(1)) if m else 0.0
+
+    # ── Quadro 3: Rendimentos Tributáveis ────────────────────────────────────
+    q3 = _section(r'RENDIMENTOS TRIBUT[ÁA]VEIS', r'RENDIMENTOS ISENTOS')
+    total_rend = _val_in(q3, 1)
+    inss_dedu  = _val_in(q3, 2)
+    prev_priv  = _val_in(q3, 3)
+    irrf       = _val_in(q3, 5)
+
+    if total_rend:
+        add('Rendimentos Tributáveis PJ', '', 'Proventos de Aposentadoria/Pensão',
+            '01', 'Total dos Rendimentos',
+            valor_2025=total_rend, tipo_rendimento='Tributável')
+    if inss_dedu:
+        add('Rendimentos Tributáveis PJ', '', 'Deduções',
+            '02', 'Contribuição Previdenciária Oficial (INSS)',
+            valor_2025=inss_dedu, tipo_rendimento='Dedução')
+    if prev_priv:
+        add('Rendimentos Tributáveis PJ', '', 'Deduções',
+            '03', 'Contribuição à Previdência Privada / FAPI',
+            valor_2025=prev_priv, tipo_rendimento='Dedução')
+    if irrf:
+        add('Rendimentos Tributáveis PJ', '', 'Imposto',
+            '05', 'IR Retido na Fonte (IRRF)',
+            valor_2025=irrf, irrf=irrf, tipo_rendimento='Tributável')
+
+    # ── Quadro 4: Rendimentos Isentos ─────────────────────────────────────────
+    q4 = _section(r'RENDIMENTOS ISENTOS E N[ÃA]O TRIBUT[ÁA]VEIS',
+                  r'TRIBUTA[CÇ][ÃA]O EXCLUSIVA')
+    apos_isenta  = _val_in(q4, 1)
+    dec13_isento = _val_in(q4, 2)
+
+    if apos_isenta:
+        add('Rendimentos Isentos', '', 'Rendimentos Isentos e Não Tributáveis',
+            '01', 'Parcela Isenta Aposentadoria/Pensão (65+)',
+            rendimento=apos_isenta, tipo_rendimento='Isento')
+    if dec13_isento:
+        add('Rendimentos Isentos', '', 'Rendimentos Isentos e Não Tributáveis',
+            '06', 'Parcela Isenta 13º Salário Aposentadoria (65+)',
+            rendimento=dec13_isento, tipo_rendimento='Isento')
+
+    # ── Quadro 5: Tributação Exclusiva ────────────────────────────────────────
+    q5 = _section(r'TRIBUTA[CÇ][ÃA]O EXCLUSIVA',
+                  r'RENDIMENTOS RECEBIDOS ACUMULADAMENTE|INFORMA[CÇ][ÕO]ES COMPLEMENTARES')
+    dec13   = _val_in(q5, 1)
+    irrf_13 = _val_in(q5, 2)
+
+    if dec13:
+        add('Rendimentos Tributação Exclusiva', '', 'Rendimentos Exclusivos',
+            '01', '13º Salário',
+            rendimento=dec13, irrf=irrf_13, tipo_rendimento='Tributação Exclusiva')
+
     if not entries:
         add('Rendimentos Tributáveis PJ', '', 'Proventos de Aposentadoria/Pensão',
             '01', 'Total dos Rendimentos (zerado)',
