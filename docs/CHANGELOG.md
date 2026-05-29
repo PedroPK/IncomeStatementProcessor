@@ -5,6 +5,27 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere a [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.7.8] - 2026-05-29
+
+### ✨ Adicionado
+
+#### Suporte ao formato "Comprovante de Rendimentos" da Receita Federal (fundos de previdência e empregadores)
+- Novo parser `parse_comprovante_rendimentos` em `src/parser.py` capaz de processar o template padrão do Ministério da Fazenda / Secretaria da Receita Federal usado por fundos de previdência (ex: NPS/Funame, SPSM) e empregadores que seguem o mesmo layout.
+- O formato é detectado automaticamente em `detect_institution()` quando o texto da primeira página contém `COMPROVANTE DE RENDIMENTOS` **e** `RAZÃO SOCIAL / NOME:`.
+- Campos extraídos (Quadros 3, 4 e 5):
+  - **Q3 – Rendimentos Tributáveis:** total de rendimentos, contribuição previdenciária oficial (INSS), contribuição à previdência privada/FAPI, IRRF.
+  - **Q4 – Rendimentos Isentos:** parcela isenta de aposentadoria/pensão (65+), parcela isenta do 13º salário de aposentadoria (65+).
+  - **Q5 – Tributação Exclusiva:** 13º salário com IRRF correspondente.
+- A extração de valores usa `re.MULTILINE` com âncora no último número da linha (`[^\n]* (valor)$`), evitando captura de sufixos de valores mais longos (ex: `5,56` ao invés de `45.085,56`).
+- Textos com valor em linha continuada (quebra de linha entre descrição e valor) são cobertos pelo fallback regex de linha seguinte.
+
+#### Extração de nome do contribuinte: padrão `NOME COMPLETO:` (RFB)
+- `extract_taxpayer_info()` em `src/normalizer.py` agora executa um pré-check em full-text procurando `NOME COMPLETO:` antes de entrar no loop linha a linha.
+- Isso evita que o Pattern B (CPF na mesma linha) vença quando o CPF aparece numa linha acima do nome (comportamento do PDF NPS/Funame).
+- Labels de cabeçalho como `Uso Interno:` são descartadas por conterem `:` — nomes de pessoas reais nunca contêm dois pontos.
+
+---
+
 ## [1.7.7] - 2026-05-28
 
 ### 🐛 Corrigido

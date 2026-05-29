@@ -129,6 +129,7 @@ def detect_institution(filename: str, first_page: str) -> str
 | XP Previdência | `xp` + `prev`/`previd` no filename |
 | FACHESF | `fachesf` ou `chesf` no filename, ou `fundacao chesf` no texto |
 | INSS | `inss` no filename, ou `regime geral de previdencia`/`frgps` no texto |
+| Comprovante RFB | `comprovante de rendimentos` + `razão social / nome:` no texto (formato genérico MF/RFB) |
 
 **Dispatcher Principal:**
 
@@ -694,6 +695,19 @@ def clean(text: str) -> str
 def extract_year(text: str, default: int = 2025) -> int
 ```
 Regex: `(19|20)\d{2}`
+
+```python
+def extract_taxpayer_info(text: str) -> tuple[str, str]
+```
+Extrai `(nome_contribuinte, cpf_contribuinte)` do texto do documento. Estratégia em etapas:
+1. **CPF** — tenta CPF formatado `\d{3}\.\d{3}\.\d{3}-\d{2}`, depois mascarado `\d{3}.\*+.\*+-\d{2}`, depois 11 dígitos brutos.
+2. **Nome (pré-check)** — busca `NOME COMPLETO:` no texto completo antes do loop por linhas, evitando que o CPF em linha anterior vença por Pattern B. Rejeita resultados com `:` (são labels de cabeçalho, ex: `Uso Interno:`).
+3. **Nome (loop por linha)** — padrões em ordem de prioridade:
+   - `A0`: `NOME COMPLETO:<nome>` (formato Comprovante RFB — label explícito)
+   - `A`: `Nome: <nome>` (Avenue)
+   - `B`: nome antes ou depois de CPF na mesma linha (NuBank, INSS, Clear/XP)
+4. **FACHESF** — nome em all-caps sem espaços (palavras coladas pelo PDF)
+5. **Fallback** — padrões com rótulos: `Contribuinte:`, `Declarante:`, `Beneficiário:`
 
 ---
 
